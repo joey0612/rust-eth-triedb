@@ -1,5 +1,7 @@
 //! Traits for secure trie operations.
 
+use std::sync::Arc;
+
 use alloy_primitives::{Address, B256};
 use super::account::StateAccount;
 use super::node::NodeSet;
@@ -37,7 +39,7 @@ pub trait SecureTrieTrait {
     ///
     /// The `collect_leaf` parameter determines whether to include leaf nodes in the returned node set.
     /// The returned `NodeSet` contains all modified nodes that need to be persisted to disk.
-    fn commit(&mut self, collect_leaf: bool) -> Result<(B256, Option<NodeSet>), Self::Error>;
+    fn commit(&mut self, collect_leaf: bool) -> Result<(B256, Option<Arc<NodeSet>>), Self::Error>;
 
     /// Returns the current root hash of the trie
     fn hash(&mut self) -> B256;

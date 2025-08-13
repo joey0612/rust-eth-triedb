@@ -21,6 +21,10 @@ pub mod secure_trie;
 pub mod state_trie;
 /// Trie hasher
 pub mod trie_hasher;
+/// Trie change tracer (Geth-compatible semantics)
+pub mod trie_tracer;
+/// Trie committer (collects dirty nodes during commit)
+pub mod trie_committer;
 
 #[cfg(test)]
 mod trie_test;

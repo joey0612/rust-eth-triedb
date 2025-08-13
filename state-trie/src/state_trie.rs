@@ -1,8 +1,8 @@
 // ! State trie implementation for secure trie operations.
 
 use alloy_primitives::{Address, B256, keccak256};
+use std::sync::Arc;
 
-#[allow(unused_imports)]
 use alloy_rlp::{Encodable, Decodable};
 use reth_triedb_common::TrieDatabase;
 
@@ -138,9 +138,8 @@ where
         Ok(())
     }
 
-    fn commit(&mut self, _collect_leaf: bool) -> Result<(B256, Option<NodeSet>), Self::Error> {
-        // TODO: implement commit
-        Ok((B256::ZERO, None))
+    fn commit(&mut self, _collect_leaf: bool) -> Result<(B256, Option<Arc<NodeSet>>), Self::Error> {
+        self.trie.commit(_collect_leaf)
     }
 
     fn hash(&mut self) -> B256 {

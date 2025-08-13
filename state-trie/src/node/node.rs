@@ -52,6 +52,16 @@ impl Node {
             Node::EmptyRoot => return (None, false),
         }
     }
+
+    pub fn node_to_bytes(node: Arc<Node>) -> Vec<u8> {
+        match node.as_ref() {
+            Node::Full(full) => full.to_rlp(),
+            Node::Short(short) => short.to_rlp(),
+            Node::Hash(_) => panic!("Hash node should not be encoded"),
+            Node::Value(_) => panic!("Value node should not be encoded"),
+            Node::EmptyRoot => panic!("EmptyRoot should not be encoded"),
+        }
+    }
 }
 
 /// Node flags for caching and dirty state

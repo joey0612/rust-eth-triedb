@@ -1,32 +1,31 @@
 //! Core trie implementation for secure trie operations.
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use alloy_primitives::{B256};
 use alloy_trie::EMPTY_ROOT_HASH;
 use reth_triedb_common::TrieDatabase;
 
+use crate::trie_committer::Committer;
+
 use super::encoding::{common_prefix_length, key_to_nibbles};
-use super::node::{Node, NodeFlag, FullNode, ShortNode, must_decode_node};
+use super::node::{Node, NodeFlag, FullNode, ShortNode, must_decode_node, NodeSet, TrieNode};
 use super::secure_trie::{SecureTrieId, SecureTrieError};
 use super::trie_hasher::Hasher;
+use super::trie_tracer::TrieTracer;
 
 /// Core trie implementation
 #[derive(Clone, Debug)]
 pub struct Trie<DB> {
     root: Arc<Node>,
-    #[allow(dead_code)]
     owner: B256,
     committed: bool,
     unhashed: usize,
     uncommitted: usize,
+    pub tracer: TrieTracer,
     database: DB,
-    #[allow(dead_code)]
-    sec_key_cache: HashMap<String, Vec<u8>>,
-    difflayer: Option<HashMap<String, Arc<Node>>>,
-    #[allow(dead_code)]
-    sec_key_cache_owner: Option<*const Trie<DB>>,
+    difflayer: Option<HashMap<Vec<u8>, Vec<u8>>>,
 }
 
 /// Basic Trie operations
@@ -36,17 +35,16 @@ where
     DB::Error: std::fmt::Debug,
 {
     /// Creates a new trie with the given identifier and database
-    pub fn new(id: &SecureTrieId, database: DB, difflayer: Option<HashMap<String, Arc<Node>>>) -> Result<Self, SecureTrieError> {
+    pub fn new(id: &SecureTrieId, database: DB, difflayer: Option<HashMap<Vec<u8>, Vec<u8>>>) -> Result<Self, SecureTrieError> {
         let mut tr = Self {
             root: Arc::new(Node::EmptyRoot),
             owner: id.owner,
             committed: false,
             unhashed: 0,
             uncommitted: 0,
+            tracer: TrieTracer::new(),
             database,
-            sec_key_cache: HashMap::new(),
             difflayer: difflayer,
-            sec_key_cache_owner: None,
         };
 
         // Check if this is an empty trie (root is EmptyRootHash)
@@ -64,7 +62,7 @@ where
     }
 
     /// Sets the difflayer for the trie
-    pub fn with_difflayer(&mut self, difflayer: &HashMap<String, Arc<Node>>) -> &mut Self {
+    pub fn with_difflayer(&mut self, difflayer: &HashMap<Vec<u8>, Vec<u8>>) -> &mut Self {
         self.difflayer = Some(difflayer.clone());
         self
     }
@@ -92,6 +90,56 @@ where
         } else {
             panic!("Expected Hash node, got: {:?}", hashed);
         }
+    }
+
+    pub fn commit(&mut self, collect_leaf: bool) -> Result<(B256, Option<Arc<NodeSet>>), SecureTrieError> {
+        if matches!(&*self.root, Node::EmptyRoot) {
+            let paths = self.tracer.deleted_nodes();
+            if paths.len() == 0 {
+                self.committed = true;
+                return Ok((EMPTY_ROOT_HASH, None));
+            }
+
+            let mut nodes = NodeSet::new(self.owner);
+            for path in paths {
+                nodes.add_node(path.as_slice(), TrieNode::default());
+            }
+            self.committed = true;
+            return Ok((EMPTY_ROOT_HASH, Some(Arc::new(nodes))));
+        }
+
+        let root_hash = self.hash();
+
+        let(hash_node, dirty) = self.root.cache();
+        if !dirty {
+            self.root = Arc::new(Node::Hash(hash_node.unwrap()));
+            self.committed = true;
+            return Ok((root_hash, None));
+        }
+
+        let nodes = Arc::new(Mutex::new(NodeSet::new(self.owner)));
+        {
+            let mut nodeset = nodes.lock().unwrap();
+            for path in self.tracer.deleted_nodes() {
+                nodeset.add_node(path.as_slice(), TrieNode::default());
+            }
+        }
+
+        self.root = Committer::new(nodes.clone(), &self.tracer, collect_leaf)
+            .commit(
+                self.root.clone(), 
+                self.unhashed > 100
+            );
+
+        // Extract the final NodeSet for returning
+        let nodeset = {
+            let guard = nodes.lock().unwrap();
+            Arc::new(guard.clone())
+        };
+        self.uncommitted = 0;
+        self.committed = true;
+
+        return Ok((root_hash, Some(nodeset)))
     }
 }
 
@@ -216,7 +264,7 @@ where
     /// - new_node: The potentially updated node (for CoW)
     /// - resolved: Whether the node was resolved from hash
     fn get_internal(
-        &self, node: Arc<Node>,
+        &mut self, node: Arc<Node>,
         nibbles_key: Vec<u8>,
         pos: usize
     ) -> Result<(Option<Vec<u8>>, Arc<Node>, bool), SecureTrieError> {
@@ -389,6 +437,12 @@ where
                     val: Arc::new(Node::Full(Arc::new(branch))),
                     flags: self.new_flag(),
                 };
+
+                // Trace the insert operation
+                let mut trace_path = prefix.clone();
+                trace_path.extend_from_slice(&nibbles_key[..matchlen]);
+                self.tracer.on_insert(trace_path);
+
                 return Ok((true, Arc::new(Node::Short(Arc::new(new_short)))));
             }
 
@@ -417,6 +471,10 @@ where
 
             // Empty root - create new short node
             Node::EmptyRoot => {
+
+                // Trace the insert operation
+                self.tracer.on_insert(prefix.clone());
+
                 let new_short = ShortNode::new(nibbles_key, value.as_ref());
                 return Ok((true, Arc::new(Node::Short(Arc::new(new_short)))));
             }
@@ -468,6 +526,8 @@ where
 
                 // Complete key match - delete this node by returning EmptyRoot
                 if matchlen == nibbles_key.len() {
+                    // Trace the delete operation
+                    self.tracer.on_delete(prefix.clone());
                     return Ok((true, Arc::new(Node::EmptyRoot)));
                 }
 
@@ -489,6 +549,11 @@ where
                 // Child was modified - handle the result
                 match &*new_child {
                     Node::Short(new_child_short) => {
+                        // Trace the delete operation
+                        let mut trace_path = prefix.clone();
+                        trace_path.extend(short.key.clone());
+                        self.tracer.on_delete(trace_path);
+
                         // Merge keys when child is also a ShortNode
                         let mut merged_key = short.key.clone();
                         merged_key.extend(&new_child_short.key);
@@ -573,6 +638,11 @@ where
                                 )?;
 
                                 if let Node::Short(child_short) = &*resolved_child {
+                                    // Trace the delete operation
+                                    let mut trace_path = prefix.clone();
+                                    trace_path.extend(&pos_nibbles);
+                                    self.tracer.on_delete(trace_path);
+
                                     // Merge with child ShortNode
                                     let mut merged_key = vec![non_empty_pos as u8];
                                     merged_key.extend(&child_short.key);
@@ -644,10 +714,10 @@ where
 {
 
     /// Resolves a node from a hash
-    fn resolve(&self, node: Arc<Node> , _prefix: &[u8]) -> Result<Arc<Node>, SecureTrieError> {
+    fn resolve(&mut self, node: Arc<Node> , prefix: &[u8]) -> Result<Arc<Node>, SecureTrieError> {
         match &*node {
             Node::Hash(hash) => {
-                return self.resolve_and_track(hash, _prefix);
+                return self.resolve_and_track(hash, prefix);
             }
             _ => {
                 return Ok(node);
@@ -656,17 +726,19 @@ where
     }
 
     /// Resolves a hash and tracks it in the difflayer
-    fn resolve_and_track(&self, hash: &B256, _prefix: &[u8]) -> Result<Arc<Node>, SecureTrieError> {
+    fn resolve_and_track(&mut self, hash: &B256, prefix: &[u8]) -> Result<Arc<Node>, SecureTrieError> {
         // 1. Check if the hash is in the difflayer
         if let Some(difflayer) = &self.difflayer {
-            if let Some(node) = difflayer.get(&hash.to_string()) {
-                return Ok(node.clone());
+            if let Some(node_blob) = difflayer.get(hash.as_slice()) {
+                self.tracer.on_read(prefix, node_blob.clone());
+                return Ok(must_decode_node(Some(*hash), node_blob));
             }
         }
 
         // 2. Check if the hash is in the database
-        if let Some(node_data) = self.database.get(hash).map_err(|e| SecureTrieError::Database(format!("{:?}", e)))? {
-            let node = must_decode_node(Some(*hash), &node_data);
+        if let Some(node_blob) = self.database.get(hash).map_err(|e| SecureTrieError::Database(format!("{:?}", e)))? {
+            self.tracer.on_read(prefix, node_blob.clone());
+            let node = must_decode_node(Some(*hash), &node_blob);
             return Ok(node);
         }
 

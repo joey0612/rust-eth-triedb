@@ -1920,3 +1920,103 @@ fn test_update_and_get_storage_various_sizes() {
         assert_eq!(stored.as_deref(), Some(value.as_slice()), "Mismatch for size {}", len);
     }
 }
+
+#[test]
+fn test_committer_parallel_equivalence() {
+    use reth_triedb_pathdb::{PathDB, PathProviderConfig};
+    use crate::secure_trie::{SecureTrieBuilder, SecureTrieId};
+    use crate::trie_committer::Committer;
+    use std::sync::{Arc, Mutex};
+    use std::env;
+    use crate::node::{NodeSet, Node};
+
+    // Prepare temporary DB directories
+    let temp_dir1 = env::temp_dir().join("trie_commit_equiv1");
+    let temp_dir2 = env::temp_dir().join("trie_commit_equiv2");
+    let db1 = PathDB::new(temp_dir1.to_str().unwrap(), PathProviderConfig::default())
+        .expect("create db1");
+    let db2 = PathDB::new(temp_dir2.to_str().unwrap(), PathProviderConfig::default())
+        .expect("create db2");
+
+    // Build two identical StateTries
+    let id = SecureTrieId::new(B256::ZERO);
+    let mut st1 = SecureTrieBuilder::new(db1.clone()).with_id(id.clone()).build().unwrap();
+    let mut st2 = SecureTrieBuilder::new(db2.clone()).with_id(id.clone()).build().unwrap();
+
+    // Insert 100_000 identical key-value pairs
+    for i in 0u32..100_000 {
+        let key = format!("key{}", i);
+        let key_bytes = key.as_bytes();
+        let value: &[u8] = &[0u8; 100];
+        st1.trie_mut().update(key_bytes, value).unwrap();
+        st2.trie_mut().update(key_bytes, value).unwrap();
+    }
+
+    // Delete first 20_000 keys
+    for i in 0u32..20_000 {
+        let key = format!("key{}", i);
+        let key_bytes = key.as_bytes();
+        st1.trie_mut().delete(key_bytes).unwrap();
+        st2.trie_mut().delete(key_bytes).unwrap();
+    }
+
+    // Pre-hash tries to populate cache (mimics normal commit flow)
+    let hash1 = st1.trie_mut().hash();
+    let hash2 = st2.trie_mut().hash();
+
+    println!("Pre-hash Trie1: {:02x?}", hash1);
+    println!("Pre-hash Trie2: {:02x?}", hash2);
+
+    assert_eq!(hash1, hash2, "Hashes should be the same");
+
+    // Owner hash for NodeSet
+    let owner = st1.id().owner;
+
+    // SERIAL commit (parallel = false)
+    let nodes_serial = Arc::new(Mutex::new(NodeSet::new(owner)));
+    let tracer_serial_ref = &st1.trie().tracer;
+    let mut comm_serial = Committer::new(nodes_serial.clone(), tracer_serial_ref, true);
+    let hash_node_serial = comm_serial.commit(st1.trie().root(), false);
+    let root_hash_serial = match hash_node_serial.as_ref() {
+        Node::Hash(h) => *h,
+        _ => panic!("serial committer did not return Hash node"),
+    };
+
+    // PARALLEL commit (parallel = true)
+    let nodes_parallel = Arc::new(Mutex::new(NodeSet::new(owner)));
+    let tracer_parallel = &st2.trie().tracer;
+    let mut comm_parallel = Committer::new(nodes_parallel.clone(), tracer_parallel, true);
+    let hash_node_parallel = comm_parallel.commit(st2.trie().root(), true);
+    let root_hash_parallel = match hash_node_parallel.as_ref() {
+        Node::Hash(h) => *h,
+        _ => panic!("parallel committer did not return Hash node"),
+    };
+
+    assert_eq!(root_hash_serial, root_hash_parallel, "Root hashes differ between serial and parallel commit");
+
+    let sig_serial = nodes_serial.lock().unwrap().signature();
+    let sig_parallel = nodes_parallel.lock().unwrap().signature();
+
+    assert_eq!(sig_serial, sig_parallel, "NodeSet signatures differ between serial and parallel commit");
+
+    // Print NodeSet information for visual inspection
+    {
+        let guard = nodes_serial.lock().unwrap();
+        println!("Serial NodeSet -> updates: {}, deletes: {}, nodes: {}, leaves: {}, signature: {:02x?}",
+            guard.size().0,
+            guard.size().1,
+            guard.nodes().len(),
+            guard.leaf_count(),
+            guard.signature());
+    }
+
+    {
+        let guard = nodes_parallel.lock().unwrap();
+        println!("Parallel NodeSet -> updates: {}, deletes: {}, nodes: {}, leaves: {}, signature: {:02x?}",
+            guard.size().0,
+            guard.size().1,
+            guard.nodes().len(),
+            guard.leaf_count(),
+            guard.signature());
+    }
+}

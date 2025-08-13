@@ -353,6 +353,8 @@ mod tests {
 
     #[test]
     fn test_compare_hash_large_scale() {
+        use crate::traits::SecureTrieTrait;
+
         // Expected hash values from BSC implementation
         // These values are computed by BSC Go implementation for comparison
         let expected_hashes = [
@@ -480,6 +482,23 @@ mod tests {
 
                 let expected_size = TOTAL_KEYS - TOTAL_BATCHES * DELETE_SIZE;
         println!("期望最终 key 数量: {}", expected_size);
+
+        let (root_hash, nodes_opt) = state_trie.commit(true).expect("Failed to commit trie");
+        if let Some(nodes) = nodes_opt {
+            // The same to BSC result - nodes sig "293954881d37bc70a771b7ed89e359c101453dd268cc2990259ab7906cc828da"
+            // Temporarily commented out due to high CPU usage when running at full capacity.
+            // println!("Final root hash: {root_hash:?}, nodes_sig: {:?}", nodes.signature());
+            let (updates, deletes) = nodes.size();      // 已公开
+            let node_cnt    = nodes.nodes().len();
+            let leaf_cnt           = nodes.leaf_count(); // 之前实现的辅助方法
+        
+            println!(
+                "Final root hash: {root_hash:?}, updates: {updates}, deletes: {deletes}, nodes: {node_cnt}, leaves: {leaf_cnt}"
+            );
+            
+        } else {
+            panic!("StateTrie commit failed");
+        }
 
         println!("✅ Large scale trie hash test completed!");
     }
