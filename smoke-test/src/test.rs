@@ -1,5 +1,3 @@
-
-
 // use crate::reth_trie_state_root::RethTrieStateRootPreparer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use crate::SmokeTest;
@@ -47,8 +45,7 @@ fn test_storage_trie_smoke_test() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer())
         .with(tracing_subscriber::EnvFilter::new("info"))
-        .try_init()
-        .ok();
+        .init();
 
     println!("Starting Reth StateTrie smoke test...");
 
