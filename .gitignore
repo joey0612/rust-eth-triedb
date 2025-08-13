@@ -1,0 +1,35 @@
+# Rust / Cargo
+/target/
+**/*.rs.bk
+/db/pathdb/target/
+
+# Native build artifacts
+*.dll
+*.dylib
+*.so
+*.a
+*.o
+
+# Test/coverage/profiling
+*.profraw
+*.profdata
+coverage/
+.coverage/
+lcov.info
+
+# Logs
+*.log
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+
+# Go build outputs (for smoke-test FFI, if built locally)
+bin/
+pkg/
+go-build/
+**/*.test
+

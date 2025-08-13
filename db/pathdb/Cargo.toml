@@ -1,0 +1,31 @@
+[package]
+name = "reth-triedb-pathdb"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "PathDB implementation for RocksDB integration"
+
+[dependencies]
+# reth
+reth-triedb-common = { path = "../../common" }
+
+# alloy
+alloy-primitives = { workspace = true }
+
+# RocksDB
+rocksdb = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# LRU Cache
+schnellru = { workspace = true }
+
+# Testing
+tempfile = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile = "3.8"

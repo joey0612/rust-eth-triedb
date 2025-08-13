@@ -1,0 +1,40 @@
+[workspace]
+members = [
+    "common",
+    "db/memorydb",
+    "db/pathdb",
+    "state-trie",
+    "smoke-test",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.76"
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/joey/bsc-reth"
+repository = "https://github.com/joey/bsc-reth"
+
+[workspace.lints]
+rust = { unsafe_code = "forbid" }
+
+[workspace.dependencies]
+alloy-primitives = "1.3.0"
+alloy-rlp = "0.3"
+alloy-trie = "0.9.0"
+auto_impl = "1.2"
+thiserror = "1.0"
+parking_lot = "0.12"
+pretty_assertions = "1.4"
+rayon = "1.8"
+rand = "0.8"
+hex = "0.4"
+rocksdb = "0.21"
+tracing = "0.1"
+schnellru = "0.2"
+tempfile = "3.8"
+reth-triedb-common = { version = "0.1.0", path = "common" }
+reth-triedb-memorydb = { version = "0.1.0", path = "db/memorydb" }
+reth-triedb-pathdb = { version = "0.1.0", path = "db/pathdb" }
+
