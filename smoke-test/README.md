@@ -56,7 +56,7 @@ If you have all dependencies installed, you can quickly run the test:
 
 ```bash
 # 1. Enter project directory
-cd reth/crates/triedb/smoke-test
+cd rust-eth-triedb/smoke-test
 
 # 2. Compile BSC library
 go build -buildmode=c-shared -o libbsc_trie.dylib bsc_trie_wrapper.go

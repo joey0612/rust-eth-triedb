@@ -9,7 +9,7 @@ use alloy_rlp::{Decodable, Encodable, Header, Error as RlpError, };
 use alloy_primitives::{keccak256, B256};
 use crate::encoding::*;
 use crate::node::rlp_raw::*;
-use super::{Node, NodeFlag, HashNode, decode_node::decode_ref};
+use super::{Node, NodeFlag, HashNode};
 
 
 /// Short node (extension or leaf)
@@ -159,7 +159,7 @@ impl Decodable for ShortNode {
             return Ok(ShortNode::new(key, &Node::Value(val.to_vec())));
         }
 
-        let (val, _) = decode_ref(value_buf)?;
+        let (val, _) = Node::decode_ref(value_buf)?;
         return Ok(ShortNode::new(key, &val));
     }
 }

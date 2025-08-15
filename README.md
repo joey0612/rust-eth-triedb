@@ -35,13 +35,28 @@ High-performance Trie/DB implementations for Ethereum state (MPT), fully compati
 cargo build --workspace
 ```
 
-2) Test (includes MemoryDB and state-trie unit tests)
+2) Smoke Test (random updates and deletes, compare the root hash with geth)
+
+```bash
+# 1. Enter project directory
+cd rust-eth-triedb/smoke-test
+
+# 2. Compile BSC library
+go build -buildmode=c-shared -o libbsc_trie.dylib bsc_trie_wrapper.go
+
+# 3. Install dynamic library
+sudo cp libbsc_trie.dylib /usr/local/lib/
+
+# 4. Return to reth root directory and run test
+cd ../../..
+cargo run -p reth-triedb-smoke-test
+```
+
+3) Test (includes MemoryDB and state-trie unit tests)
 
 ```bash
 cargo test --workspace
 ```
-
-> Note: if you enable the FFI-based comparison in `smoke-test`, make sure the required dynamic library and environment are prepared. Otherwise, you can run the core crates’ tests only.
 
 ### External API
 

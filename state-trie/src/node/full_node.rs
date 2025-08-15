@@ -8,7 +8,7 @@ use std::sync::Arc;
 use alloy_rlp::{Decodable, Encodable, Header, Error as RlpError};
 use alloy_primitives::{keccak256, B256};
 use crate::node::rlp_raw::*;
-use crate::node::{HashNode, Node, NodeFlag, decode_node::decode_ref};
+use crate::node::{HashNode, Node, NodeFlag};
 
 /// Full node with 17 children (16 hex digits + value)
 #[derive(Clone, Debug, PartialEq)]
@@ -136,7 +136,7 @@ impl Decodable for FullNode {
     fn decode(buf: &mut &[u8]) -> Result<Self, RlpError> {
         let mut full_node = FullNode::new();
         for i in 0..16 {
-            let (child, reset) = decode_ref(buf)?;
+            let (child, reset) = Node::decode_ref(buf)?;
             full_node.children[i] = child;
             *buf = reset;
         }

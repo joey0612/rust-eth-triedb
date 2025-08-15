@@ -10,7 +10,7 @@ use reth_triedb_common::TrieDatabase;
 use crate::trie_committer::Committer;
 
 use super::encoding::{common_prefix_length, key_to_nibbles};
-use super::node::{Node, NodeFlag, FullNode, ShortNode, must_decode_node, NodeSet, TrieNode};
+use super::node::{Node, NodeFlag, FullNode, ShortNode, NodeSet, TrieNode};
 use super::secure_trie::{SecureTrieId, SecureTrieError};
 use super::trie_hasher::Hasher;
 use super::trie_tracer::TrieTracer;
@@ -731,14 +731,14 @@ where
         if let Some(difflayer) = &self.difflayer {
             if let Some(node_blob) = difflayer.get(hash.as_slice()) {
                 self.tracer.on_read(prefix, node_blob.clone());
-                return Ok(must_decode_node(Some(*hash), node_blob));
+                return Ok(Node::must_decode_node(Some(*hash), node_blob));
             }
         }
 
         // 2. Check if the hash is in the database
         if let Some(node_blob) = self.database.get(hash).map_err(|e| SecureTrieError::Database(format!("{:?}", e)))? {
             self.tracer.on_read(prefix, node_blob.clone());
-            let node = must_decode_node(Some(*hash), &node_blob);
+            let node = Node::must_decode_node(Some(*hash), &node_blob);
             return Ok(node);
         }
 

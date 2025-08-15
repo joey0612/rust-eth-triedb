@@ -16,12 +16,10 @@ pub mod node;
 pub mod node_set;
 pub mod short_node;
 
-// Node decoding utilities
-pub mod decode_node;
+// Node encoding/decoding utilities
 pub mod rlp_raw;
 
 // Re-export main types
-pub use decode_node::{must_decode_node, decode_node};
 pub use full_node::FullNode;
 pub use node::{HashNode, Node, NodeFlag, ValueNode};
 pub use node_set::{NodeSet, TrieNode};
