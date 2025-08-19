@@ -203,7 +203,7 @@ where
             panic!("accounts_with_storage_trie and storage_tries have different lengths");
         }
 
-        for (hashed_address, storage_hash) in storage_hashes {
+        for (hashed_address, storage_hash) in storage_hashes {            
             let mut account = self.accounts_with_storage_trie.get(&hashed_address).unwrap().clone();
             account.storage_root = storage_hash;
             self.update_account_with_hash_state(hashed_address, &account)?;
@@ -280,6 +280,10 @@ where
             }
         }
         self.accounts_with_storage_trie = update_accounts_with_storage;
+
+        let accounts_with_storage_trie_len = self.accounts_with_storage_trie.len();
+        let storage_states_len = storage_states.len();
+        assert_eq!(accounts_with_storage_trie_len, storage_states_len);
 
         // Clone required data to avoid borrowing conflicts
         let accounts_clone = self.accounts_with_storage_trie.clone();

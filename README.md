@@ -58,12 +58,6 @@ cargo run -p reth-triedb-smoke-test
 cargo test --workspace
 ```
 
-### External API
-
-The state trie exposes a single, unified interface for managing both the account trie and storage trie.
-
-> TODO: Add triedb traits
-
 ### Usage examples
 
 > TODO: Add examples for `insert/get/commit` with MemoryDB/PathDB, and sample configuration for parallel hashing.

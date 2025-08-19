@@ -3,6 +3,9 @@
 pub mod traits;
 pub mod triedb;
 
+#[cfg(test)]
+mod triedb_test;
+
 // Re-export main types
 pub use traits::TrieDBTrait;
 pub use triedb::TrieDB;

@@ -2088,11 +2088,13 @@ name = "triedb"
 version = "0.1.0"
 dependencies = [
  "alloy-primitives",
+ "once_cell",
  "rayon",
  "reth-triedb-common",
  "reth-triedb-pathdb",
  "reth-triedb-state-trie",
  "serde",
+ "tempfile",
  "thiserror 1.0.69",
  "tokio",
 ]

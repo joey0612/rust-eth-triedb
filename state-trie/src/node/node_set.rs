@@ -54,7 +54,7 @@ struct Leaf {
 
 /// NodeSet contains a set of nodes collected during the commit operation.
 /// Each node is keyed by path. It's not thread-safe to use.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct NodeSet {
     /// Owner hash (zero for account trie, account address hash for storage tries)
     pub owner: B256,
@@ -258,6 +258,44 @@ impl NodeSet {
 
         // 5. hash
         keccak256(&buf)
+    }
+}
+
+impl std::fmt::Debug for NodeSet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "=== NodeSet Debug Info ===")?;
+        writeln!(f, "Owner: {:?}", self.owner)?;
+        writeln!(f, "Total nodes: {} (updates: {}, deletes: {})", self.nodes.len(), self.updates, self.deletes)?;
+        
+        if !self.leaves.is_empty() {
+            writeln!(f, "Leaves ({}):", self.leaves.len())?;
+            for (i, leaf) in self.leaves.iter().enumerate() {
+                writeln!(f, "  [{}] Parent: {:?}, Blob size: {}", i, leaf.parent, leaf.blob.len())?;
+            }
+        }
+        
+        if !self.nodes.is_empty() {
+            writeln!(f, "Nodes:")?;
+            let mut paths: Vec<_> = self.nodes.keys().collect();
+            paths.sort();
+            
+            for path in paths {
+                if let Some(node) = self.nodes.get(path) {
+                    if node.is_deleted() {
+                        writeln!(f, "  Path: {:x?} -> DELETED", path.as_bytes())?;
+                    } else {
+                        let hash_str = match node.hash {
+                            Some(h) => format!("{:?}", h),
+                            None => "None".to_string(),
+                        };
+                        let blob_size = node.blob.as_ref().map(|b| b.len()).unwrap_or(0);
+                        writeln!(f, "  Path: {:x?} -> Hash: {}, Blob size: {}", 
+                            path.as_bytes(), hash_str, blob_size)?;
+                    }
+                }
+            }
+        }
+        writeln!(f, "=== End NodeSet Debug ===")
     }
 }
 
