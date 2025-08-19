@@ -1,24 +1,21 @@
-//! Traits for secure trie operations.
+//! Traits for trie database operations.
 
-use std::{sync::Arc};
+use std::sync::Arc;
+use std::collections::HashMap;
+use alloy_primitives::{B256, Address};
+use reth_triedb_state_trie::account::StateAccount;
+use reth_triedb_state_trie::node::MergedNodeSet;
 
-use alloy_primitives::{Address, B256};
-use super::account::StateAccount;
-use super::node::{NodeSet, MergedNodeSet};
+/// Error type for trie database operations
+pub type TrieDBError = super::triedb::TrieDBError;
 
-/// Error type for secure trie operations
-pub type SecureTrieError = super::secure_trie::SecureTrieError;
-
-/// Trait for secure trie operations
-pub trait SecureTrieTrait {
+/// Trait for trie database operations
+pub trait TrieDBTrait: Sized {
     /// Associated error type
     type Error;
 
-    /// Returns the trie identifier
-    fn id(&self) -> &super::secure_trie::SecureTrieId;
-
-    /// Sets the difflayer for the trie
-    fn with_difflayer(&mut self, difflayer: Option<Arc<MergedNodeSet>>) -> Result<(), Self::Error>;
+    /// Opens the trie database at a given root hash
+    fn state_at(&mut self, root_hash: B256, difflayer: Option<Arc<MergedNodeSet>>) -> Result<Self, Self::Error>;
 
     /// Gets an account from the trie by address
     fn get_account(&mut self, address: Address) -> Result<Option<StateAccount>, Self::Error>;
@@ -41,27 +38,37 @@ pub trait SecureTrieTrait {
     /// Gets an account from the trie by hash state
     fn get_account_with_hash_state(&mut self, hashed_address: B256) -> Result<Option<StateAccount>, Self::Error>;
 
-    /// Updates an account in the trie by hash state
+    /// Updates an account from the trie by hash state
     fn update_account_with_hash_state(&mut self, hashed_address: B256, account: &StateAccount) -> Result<(), Self::Error>;
 
     /// Deletes an account from the trie by hash state
     fn delete_account_with_hash_state(&mut self, hashed_address: B256) -> Result<(), Self::Error>;
 
     /// Gets storage value for an account by key and hash state
-    fn get_storage_with_hash_state(&mut self, hashed_address: B256, hashed_key: B256) -> Result<Option<Vec<u8>>, Self::Error>;
+    fn get_storage_with_hash_state(&mut self, address: B256, hashed_key: B256) -> Result<Option<Vec<u8>>, Self::Error>;
 
     /// Updates storage value for an account by key and hash state
-    fn update_storage_with_hash_state(&mut self, hashed_address: B256, hashed_key: B256, value: &[u8]) -> Result<(), Self::Error>;
+    fn update_storage_with_hash_state(&mut self, address: B256, hashed_key: B256, value: &[u8]) -> Result<(), Self::Error>;
 
     /// Deletes storage value for an account by key and hash state
-    fn delete_storage_with_hash_state(&mut self, hashed_address: B256, hashed_key: B256) -> Result<(), Self::Error>;
+    fn delete_storage_with_hash_state(&mut self, address: B256, hashed_key: B256) -> Result<(), Self::Error>;
 
-    /// Returns the current root hash of the trie
-    fn hash(&mut self) -> B256;
+    /// Returns the current root hash of the triedb
+    fn calculate_hash(&mut self) -> Result<B256, Self::Error>;
 
     /// Commits the trie and returns the root hash and modified node set
     ///
     /// The `collect_leaf` parameter determines whether to include leaf nodes in the returned node set.
     /// The returned `NodeSet` contains all modified nodes that need to be persisted to disk.
-    fn commit(&mut self, collect_leaf: bool) -> Result<(B256, Option<Arc<NodeSet>>), Self::Error>;
+    fn commit(&mut self, collect_leaf: bool) -> Result<(B256, Arc<MergedNodeSet>), Self::Error>;
+
+    /// Updates the states of the trie with the given states and storage states
+    fn update_all(
+        &mut self, 
+        root_hash: B256, 
+        difflayer: Option<Arc<MergedNodeSet>>, 
+        states: HashMap<B256, Option<StateAccount>>, 
+        storage_states: HashMap<B256, HashMap<B256, Option<Vec<u8>>>>) -> Result<(B256, Option<Arc<MergedNodeSet>>), TrieDBError>;
+
+    fn flush(&mut self, nodes: Option<Arc<MergedNodeSet>>) -> Result<(), Self::Error>;
 }

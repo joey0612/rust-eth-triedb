@@ -11,7 +11,6 @@ use tracing::{error, trace};
 
 use crate::traits::*;
 use reth_triedb_common::TrieDatabase;
-use alloy_primitives::B256;
 
 /// PathDB implementation using RocksDB.
 pub struct PathDB {
@@ -24,10 +23,10 @@ pub struct PathDB {
     /// Read options for read operations.
     read_options: ReadOptions,
     /// LRU cache for key-value pairs.
-    cache: Mutex<LruMap<Vec<u8>, Option<Vec<u8>>, ByLength>>,
+    cache: Arc<Mutex<LruMap<Vec<u8>, Option<Vec<u8>>, ByLength>>>,
 }
 
-impl Debug for PathDB {
+impl<'a> Debug for PathDB {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("PathDB")
             .field("config", &self.config)
@@ -35,7 +34,7 @@ impl Debug for PathDB {
     }
 }
 
-impl Clone for PathDB {
+impl<'a> Clone for PathDB {
     fn clone(&self) -> Self {
         let mut write_options = WriteOptions::default();
         write_options.set_sync(self.config.use_fsync);
@@ -47,7 +46,7 @@ impl Clone for PathDB {
             config: self.config.clone(),
             write_options,
             read_options,
-            cache: Mutex::new(LruMap::new(ByLength::new(self.config.cache_size))),
+            cache: self.cache.clone(),
         }
     }
 }
@@ -99,7 +98,7 @@ impl<'a> Debug for PathDBSnapshot<'a> {
     }
 }
 
-impl PathDB {
+impl<'a> PathDB {
     /// Create a new PathDB instance.
     pub fn new(path: &str, config: PathProviderConfig) -> PathProviderResult<Self> {
         let mut db_opts = Options::default();
@@ -126,7 +125,7 @@ impl PathDB {
             config,
             write_options,
             read_options,
-            cache: Mutex::new(LruMap::new(ByLength::new(cache_size))),
+            cache: Arc::new(Mutex::new(LruMap::new(ByLength::new(cache_size)))),
         })
     }
 
@@ -648,26 +647,20 @@ impl PathDBFactory {
 impl TrieDatabase for PathDB {
     type Error = PathProviderError;
 
-    fn get(&self, hash: &B256) -> Result<Option<Vec<u8>>, Self::Error> {
-        let key = hash.as_slice();
-        PathProvider::get(self, key)
+    fn get(&self, path: &[u8]) -> Result<Option<Vec<u8>>, Self::Error> {
+        PathProvider::get(self, path)
     }
 
-    fn insert(&self, hash: B256, data: Vec<u8>) -> Result<(), Self::Error> {
-        let key = hash.as_slice();
-        PathProvider::put(self, key, &data)
+    fn insert(&self, path: &[u8], data: Vec<u8>) -> Result<(), Self::Error> {
+        PathProvider::put(self, path, &data)
     }
 
-    fn contains(&self, hash: &B256) -> Result<bool, Self::Error> {
-        let key = hash.as_slice();
-        PathProvider::exists(self, key)
+    fn contains(&self, path: &[u8]) -> Result<bool, Self::Error> {
+        PathProvider::exists(self, path)
     }
 
-    fn remove(&self, hash: &B256) -> Result<Option<Vec<u8>>, Self::Error> {
-        let key = hash.as_slice();
-        let value = PathProvider::get(self, key)?;
-        PathProvider::delete(self, key)?;
-        Ok(value)
+    fn remove(&self, path: &[u8]) {
+        let _ = PathProvider::delete(self, path);
     }
 }
 

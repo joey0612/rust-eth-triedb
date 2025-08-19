@@ -1,7 +1,7 @@
 // ! State trie implementation for secure trie operations.
 
 use alloy_primitives::{Address, B256, keccak256};
-use std::sync::Arc;
+use std::{sync::Arc};
 
 use alloy_rlp::{Encodable, Decodable};
 use reth_triedb_common::TrieDatabase;
@@ -10,10 +10,11 @@ use super::account::StateAccount;
 use super::secure_trie::{SecureTrieId, SecureTrieError};
 use super::traits::SecureTrieTrait;
 use super::trie::Trie;
-use super::node::{NodeSet};
+use super::node::{NodeSet, MergedNodeSet};
 use super::node::rlp_raw;
 
 /// State trie implementation that wraps a trie with secure key hashing
+#[derive(Clone)]
 pub struct StateTrie<DB> {
     trie: Trie<DB>,
     id: SecureTrieId,
@@ -82,6 +83,11 @@ where
         &self.id
     }
 
+    fn with_difflayer(&mut self, difflayer: Option<Arc<MergedNodeSet>>) -> Result<(), Self::Error> {
+        self.trie.with_difflayer(difflayer)?;
+        Ok(())
+    }
+
     fn get_account(&mut self, address: Address) -> Result<Option<StateAccount>, Self::Error> {
         let hashed_address = self.hash_key(address.as_slice());
         if let Some(data) = self.trie.get(hashed_address.as_slice())? {
@@ -138,12 +144,62 @@ where
         Ok(())
     }
 
-    fn commit(&mut self, _collect_leaf: bool) -> Result<(B256, Option<Arc<NodeSet>>), Self::Error> {
-        self.trie.commit(_collect_leaf)
+    fn get_account_with_hash_state(&mut self, hashed_address: B256) -> Result<Option<StateAccount>, Self::Error> {
+        if let Some(data) = self.trie.get(hashed_address.as_slice())? {
+            let account = StateAccount::decode(&mut &data[..])
+                .map_err(|_| SecureTrieError::InvalidAccount)?;
+            Ok(Some(account))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn update_account_with_hash_state(&mut self, hashed_address: B256, account: &StateAccount) -> Result<(), Self::Error> {
+        let mut encoded_account = Vec::new();
+        account.encode(&mut encoded_account);
+        self.trie.update(hashed_address.as_slice(), &encoded_account)?;
+        Ok(())
+    }
+
+    fn delete_account_with_hash_state(&mut self, hashed_address: B256) -> Result<(), Self::Error> {
+        self.trie.delete(hashed_address.as_slice())?;
+        Ok(())
+    }
+
+    fn get_storage_with_hash_state(&mut self, _: B256, hashed_key: B256) -> Result<Option<Vec<u8>>, Self::Error> {
+        let enc = self.trie.get(hashed_key.as_slice())?;
+
+        if enc.is_none() {
+            return Ok(None);
+        }
+
+        let enc = enc.unwrap();
+        if enc.is_empty() {
+            return Ok(None);
+        }
+
+        // Extract the RLP string/content. Map any raw-RLP error to our domain error.
+        let (_, value, _) = rlp_raw::split(&enc).map_err(|_| SecureTrieError::InvalidStorage)?;
+        Ok(Some(value.to_vec()))
+    }
+
+    fn update_storage_with_hash_state(&mut self, _: B256, hashed_key: B256, value: &[u8]) -> Result<(), Self::Error> {
+        let encoded_value = alloy_rlp::encode(value);
+        self.trie.update(hashed_key.as_slice(), &encoded_value)?;
+        Ok(())
+    }
+    
+    fn delete_storage_with_hash_state(&mut self, _: B256, hashed_key: B256) -> Result<(), Self::Error> {
+        self.trie.delete(hashed_key.as_slice())?;
+        Ok(())
     }
 
     fn hash(&mut self) -> B256 {
         self.trie.hash()
+    }
+
+    fn commit(&mut self, _collect_leaf: bool) -> Result<(B256, Option<Arc<NodeSet>>), Self::Error> {
+        self.trie.commit(_collect_leaf)
     }
 }
 

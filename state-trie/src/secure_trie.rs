@@ -41,8 +41,6 @@ pub struct SecureTrieId {
     pub state_root: B256,
     /// Owner address
     pub owner: B256,
-    /// Trie root hash
-    pub storage_root: B256,
 }
 
 impl Default for SecureTrieId {
@@ -50,7 +48,6 @@ impl Default for SecureTrieId {
         Self {
             state_root: EMPTY_ROOT_HASH,
             owner: B256::ZERO,
-            storage_root: EMPTY_ROOT_HASH,
         }
     }
 }
@@ -61,7 +58,6 @@ impl SecureTrieId {
         Self {
             state_root: state_root,
             owner: B256::ZERO,
-            storage_root: EMPTY_ROOT_HASH,
         }
     }
 
@@ -71,11 +67,6 @@ impl SecureTrieId {
         self
     }
 
-    /// Sets the storage root for this trie identifier
-    pub fn with_storage_root(mut self, storage_root: B256) -> Self {
-        self.storage_root = storage_root;
-        self
-    }
 }
 
 /// Secure trie builder for constructing secure tries

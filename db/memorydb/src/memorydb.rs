@@ -20,7 +20,7 @@ pub enum MemoryDBError {
 #[derive(Debug, Clone)]
 pub struct MemoryDB {
     /// Storage for trie nodes.
-    nodes: Arc<RwLock<HashMap<B256, Vec<u8>>>>,
+    nodes: Arc<RwLock<HashMap<Vec<u8>, Vec<u8>>>>,
 }
 
 impl MemoryDB {
@@ -33,22 +33,22 @@ impl MemoryDB {
 
     /// Inserts a node into the database.
     pub fn insert(&self, hash: B256, data: Vec<u8>) {
-        self.nodes.write().insert(hash, data);
+        self.nodes.write().insert(hash.as_slice().to_vec(), data);
     }
 
     /// Gets a node from the database.
     pub fn get(&self, hash: &B256) -> Option<Vec<u8>> {
-        self.nodes.read().get(hash).cloned()
+        self.nodes.read().get(hash.as_slice()).cloned()
     }
 
     /// Removes a node from the database.
     pub fn remove(&self, hash: &B256) -> Option<Vec<u8>> {
-        self.nodes.write().remove(hash)
+        self.nodes.write().remove(hash.as_slice())
     }
 
     /// Checks if a node exists in the database.
     pub fn contains(&self, hash: &B256) -> bool {
-        self.nodes.read().contains_key(hash)
+        self.nodes.read().contains_key(hash.as_slice())
     }
 
     /// Clears all nodes from the database.
@@ -76,21 +76,21 @@ impl Default for MemoryDB {
 impl TrieDatabase for MemoryDB {
     type Error = MemoryDBError;
 
-    fn get(&self, hash: &B256) -> Result<Option<Vec<u8>>, Self::Error> {
-        Ok(self.get(hash))
+    fn get(&self, path: &[u8]) -> Result<Option<Vec<u8>>, Self::Error> {
+        Ok(self.nodes.read().get(path).cloned())
     }
 
-    fn insert(&self, hash: B256, data: Vec<u8>) -> Result<(), Self::Error> {
-        self.insert(hash, data);
+    fn insert(&self, path: &[u8], data: Vec<u8>) -> Result<(), Self::Error> {
+        self.nodes.write().insert(path.to_vec(), data);
         Ok(())
     }
 
-    fn contains(&self, hash: &B256) -> Result<bool, Self::Error> {
-        Ok(self.contains(hash))
+    fn contains(&self, path: &[u8]) -> Result<bool, Self::Error> {
+        Ok(self.nodes.read().contains_key(path))
     }
 
-    fn remove(&self, hash: &B256) -> Result<Option<Vec<u8>>, Self::Error> {
-        Ok(self.remove(hash))
+    fn remove(&self, path: &[u8]) {
+        let _ = self.nodes.write().remove(path);
     }
 }
 
@@ -128,10 +128,12 @@ mod tests {
         let hash = keccak256(&data);
 
         // Test TrieDatabase trait implementation
-        assert!(TrieDatabase::get(&db, &hash).unwrap().is_none());
-        TrieDatabase::insert(&db, hash, data.clone()).unwrap();
-        assert_eq!(TrieDatabase::get(&db, &hash).unwrap(), Some(data.clone()));
-        assert!(TrieDatabase::contains(&db, &hash).unwrap());
-        assert_eq!(TrieDatabase::remove(&db, &hash).unwrap(), Some(data));
+        assert!(TrieDatabase::get(&db, hash.as_slice()).unwrap().is_none());
+        TrieDatabase::insert(&db, hash.as_slice(), data.clone()).unwrap();
+        assert_eq!(TrieDatabase::get(&db, hash.as_slice()).unwrap(), Some(data.clone()));
+        assert!(TrieDatabase::contains(&db, hash.as_slice()).unwrap());
+        // Test remove - it returns () not Option<Vec<u8>>
+        TrieDatabase::remove(&db, hash.as_slice());
+        assert!(TrieDatabase::get(&db, hash.as_slice()).unwrap().is_none());
     }
 }

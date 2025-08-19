@@ -5,6 +5,7 @@ members = [
     "db/pathdb",
     "state-trie",
     "smoke-test",
+    "triedb",
 ]
 resolver = "2"
 

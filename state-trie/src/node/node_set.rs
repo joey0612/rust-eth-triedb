@@ -3,6 +3,7 @@
 //! This module provides functionality for collecting and managing nodes that
 //! have been modified during trie operations, enabling efficient batch commits.
 
+use std::sync::Arc;
 use alloy_primitives::B256;
 use std::collections::HashMap;
 
@@ -60,11 +61,11 @@ pub struct NodeSet {
     /// Leaf nodes
     leaves: Vec<Leaf>,
     /// Node map keyed by path
-    nodes: HashMap<String, TrieNode>,
+    pub nodes: HashMap<String, TrieNode>,
     /// Count of updated and inserted nodes
-    updates: usize,
+    pub updates: usize,
     /// Count of deleted nodes
-    deletes: usize,
+    pub deletes: usize,
 }
 
 impl NodeSet {
@@ -263,23 +264,25 @@ impl NodeSet {
 /// MergedNodeSet is a set of node sets that are merged together.
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
-struct MergedNodeSet {
-    sets: HashMap<B256, NodeSet>,
+pub struct MergedNodeSet {
+    pub sets: HashMap<B256, Arc<NodeSet>>,
 }
 
 impl MergedNodeSet {
     /// Create a new merged node set
     #[allow(dead_code)]
-    pub fn new(sets: HashMap<B256, NodeSet>) -> Self {
-        Self { sets }
+    pub fn new() -> Self {
+        Self { sets: HashMap::new() }
     }
 
     /// Merge a node set into the merged set
     #[allow(dead_code)]
-    pub fn merge(&mut self, other: &NodeSet) -> Result<(), String> {
+    pub fn merge(&mut self, other: Arc<NodeSet>) -> Result<(), String> {
         let subset = self.sets.get_mut(&other.owner);
         if let Some(subset) = subset {
-            subset.merge(other.owner, other.nodes.clone())?;
+            // Clone the Arc to get a mutable reference
+            let subset_clone = Arc::get_mut(subset).unwrap();
+            subset_clone.merge(other.owner, other.nodes.clone())?;
         } else {
             self.sets.insert(other.owner, other.clone());
         }
@@ -380,15 +383,15 @@ mod tests {
         let mut set_b = NodeSet::new(owner_b);
         set_b.add_node(b"b1", make_node(2, b"vb1"));
 
-        let mut merged = MergedNodeSet::new(HashMap::new());
-        merged.merge(&set_a).unwrap();
-        merged.merge(&set_b).unwrap();
+        let mut merged = MergedNodeSet::new();
+        merged.merge(Arc::new(set_a)).unwrap();
+        merged.merge(Arc::new(set_b)).unwrap();
 
         // Merge another set for owner_a that overwrites a1 and adds a2
         let mut set_a2 = NodeSet::new(owner_a);
         set_a2.add_node(b"a1", make_node(3, b"va1_new"));
         set_a2.add_node(b"a2", make_node(4, b"va2"));
-        merged.merge(&set_a2).unwrap();
+        merged.merge(Arc::new(set_a2)).unwrap();
 
         // Flatten and validate
         let flat = merged.flatten();

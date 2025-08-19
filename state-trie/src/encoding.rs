@@ -157,3 +157,34 @@ fn decode_nibbles(nibbles: &[u8], buf: &mut [u8]) {
         }
     }
 }
+
+// Trie node storage prefixes
+pub const TRIE_NODE_STORAGE_PREFIX: &[u8] = b"O";
+pub const TRIE_NODE_ACCOUNT_PREFIX: &[u8] = b"A";
+
+/// Generate storage trie node key: TrieNodeStoragePrefix + accountHash + path
+/// Equivalent to BSC's storageTrieNodeKey function
+pub fn storage_trie_node_key(account_hash: &[u8], path: &[u8]) -> Vec<u8> {
+    let mut buf = Vec::with_capacity(
+        TRIE_NODE_STORAGE_PREFIX.len() + account_hash.len() + path.len()
+    );
+    
+    buf.extend_from_slice(TRIE_NODE_STORAGE_PREFIX);
+    buf.extend_from_slice(account_hash);
+    buf.extend_from_slice(path);
+    
+    buf
+}
+
+/// Generate account trie node key: TrieNodeAccountPrefix + path
+/// Equivalent to BSC's accountTrieNodeKey function
+pub fn account_trie_node_key(path: &[u8]) -> Vec<u8> {
+    let mut buf = Vec::with_capacity(TRIE_NODE_ACCOUNT_PREFIX.len() + path.len());
+    
+    buf.extend_from_slice(TRIE_NODE_ACCOUNT_PREFIX);
+    buf.extend_from_slice(path);
+    
+    buf
+}
+
+
