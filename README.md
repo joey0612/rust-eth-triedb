@@ -100,7 +100,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (root_hash, node_set) = triedb.commit(true)?;
     println!("Committed root hash: {:?}", root_hash);
     
-    // Alternative: Use update_all to combine the above operations
+    // Alternative: Use update_and_commit to combine the above operations
     // let mut states = HashMap::new();
     // states.insert(keccak256(address.as_slice()), Some(account));
     // 
@@ -109,7 +109,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // storage_kvs.insert(keccak256(storage_key), Some(storage_value.to_vec()));
     // storage_states.insert(keccak256(address.as_slice()), storage_kvs);
     // 
-    // let (root_hash, node_set) = triedb.update_all(state_root, None, states, storage_states)?;
+    // let (root_hash, node_set) = triedb.update_and_commit(state_root, None, states, storage_states)?;
     
     Ok(())
 }

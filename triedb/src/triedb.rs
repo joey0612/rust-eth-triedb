@@ -246,7 +246,7 @@ where
         Ok((root_hash, Arc::new(merged_node_set))) 
     }
     
-    fn update_all(
+    fn update_and_commit(
         &mut self, 
         root_hash: B256, 
         difflayer: Option<Arc<MergedNodeSet>>, 

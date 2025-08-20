@@ -63,7 +63,7 @@ pub trait TrieDBTrait: Sized {
     fn commit(&mut self, collect_leaf: bool) -> Result<(B256, Arc<MergedNodeSet>), Self::Error>;
 
     /// Updates the states of the trie with the given states and storage states
-    fn update_all(
+    fn update_and_commit(
         &mut self, 
         root_hash: B256, 
         difflayer: Option<Arc<MergedNodeSet>>, 

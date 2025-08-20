@@ -93,7 +93,7 @@ fn test_update_all_initial(triedb: &mut TrieDB<PathDB>) -> Result<(B256, Option<
     println!("Constructed {} storage states", storage_states.len());
     
     // Call update_all interface
-    let result = triedb.update_all(EMPTY_ROOT_HASH, None, states, storage_states);
+    let result = triedb.update_and_commit(EMPTY_ROOT_HASH, None, states, storage_states);
     match &result {
         Ok((root_hash, node_set)) => {            
             // Assert that root_hash matches BSC implementation result
@@ -182,7 +182,7 @@ fn test_update_all_modifications(root_hash: B256, difflayer: Option<Arc<MergedNo
     println!("Preparing to update {} storage states", storage_states.len());
     
     // Call update_all interface
-    let result = triedb.update_all(root_hash, difflayer, states, storage_states);
+    let result = triedb.update_and_commit(root_hash, difflayer, states, storage_states);
     
     match result {
         Ok((root_hash, node_set)) => {
