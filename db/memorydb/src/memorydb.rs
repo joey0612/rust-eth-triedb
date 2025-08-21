@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
 
-use reth_triedb_common::TrieDatabase;
+use rust_eth_triedb_common::TrieDatabase;
 
 /// Error type for memory database operations.
 #[derive(Debug, Error)]

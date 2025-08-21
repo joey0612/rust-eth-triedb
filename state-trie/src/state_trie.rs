@@ -4,7 +4,7 @@ use alloy_primitives::{Address, B256, keccak256};
 use std::{sync::Arc};
 
 use alloy_rlp::{Encodable, Decodable};
-use reth_triedb_common::TrieDatabase;
+use rust_eth_triedb_common::TrieDatabase;
 
 use super::account::StateAccount;
 use super::secure_trie::{SecureTrieId, SecureTrieError};

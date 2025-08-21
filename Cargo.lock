@@ -1484,78 +1484,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
-name = "reth-triedb-common"
-version = "0.1.0"
-dependencies = [
- "alloy-primitives",
- "auto_impl",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "reth-triedb-memorydb"
-version = "0.1.0"
-dependencies = [
- "alloy-primitives",
- "auto_impl",
- "parking_lot",
- "pretty_assertions",
- "reth-triedb-common",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "reth-triedb-pathdb"
-version = "0.1.0"
-dependencies = [
- "alloy-primitives",
- "reth-triedb-common",
- "rocksdb",
- "schnellru",
- "tempfile",
- "thiserror 1.0.69",
- "tracing",
-]
-
-[[package]]
-name = "reth-triedb-smoke-test"
-version = "0.1.0"
-dependencies = [
- "alloy-primitives",
- "alloy-rlp",
- "alloy-trie",
- "hex",
- "rand 0.8.5",
- "reth-triedb-common",
- "reth-triedb-pathdb",
- "reth-triedb-state-trie",
- "tempfile",
- "thiserror 1.0.69",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "reth-triedb-state-trie"
-version = "0.1.0"
-dependencies = [
- "alloy-primitives",
- "alloy-rlp",
- "alloy-trie",
- "arbitrary",
- "auto_impl",
- "hex",
- "pretty_assertions",
- "rand 0.8.5",
- "rayon",
- "reth-triedb-common",
- "reth-triedb-memorydb",
- "reth-triedb-pathdb",
- "tempfile",
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "rfc6979"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1617,6 +1545,94 @@ name = "ruint-macro"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48fd7bd8a6377e15ad9d42a8ec25371b94ddc67abe7c8b9127bec79bebaaae18"
+
+[[package]]
+name = "rust-eth-triedb"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives",
+ "once_cell",
+ "rayon",
+ "rust-eth-triedb-common",
+ "rust-eth-triedb-pathdb",
+ "rust-eth-triedb-state-trie",
+ "serde",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
+name = "rust-eth-triedb-common"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives",
+ "auto_impl",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "rust-eth-triedb-memorydb"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives",
+ "auto_impl",
+ "parking_lot",
+ "pretty_assertions",
+ "rust-eth-triedb-common",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "rust-eth-triedb-pathdb"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives",
+ "rocksdb",
+ "rust-eth-triedb-common",
+ "schnellru",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
+name = "rust-eth-triedb-smoke-test"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives",
+ "alloy-rlp",
+ "alloy-trie",
+ "hex",
+ "rand 0.8.5",
+ "rust-eth-triedb-common",
+ "rust-eth-triedb-pathdb",
+ "rust-eth-triedb-state-trie",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "rust-eth-triedb-state-trie"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives",
+ "alloy-rlp",
+ "alloy-trie",
+ "arbitrary",
+ "auto_impl",
+ "hex",
+ "pretty_assertions",
+ "rand 0.8.5",
+ "rayon",
+ "rust-eth-triedb-common",
+ "rust-eth-triedb-memorydb",
+ "rust-eth-triedb-pathdb",
+ "tempfile",
+ "thiserror 1.0.69",
+]
 
 [[package]]
 name = "rustc-demangle"
@@ -2081,22 +2097,6 @@ dependencies = [
  "tracing",
  "tracing-core",
  "tracing-log",
-]
-
-[[package]]
-name = "triedb"
-version = "0.1.0"
-dependencies = [
- "alloy-primitives",
- "once_cell",
- "rayon",
- "reth-triedb-common",
- "reth-triedb-pathdb",
- "reth-triedb-state-trie",
- "serde",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
 ]
 
 [[package]]

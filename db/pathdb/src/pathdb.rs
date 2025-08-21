@@ -10,7 +10,7 @@ use schnellru::{ByLength, LruMap};
 use tracing::{error, trace};
 
 use crate::traits::*;
-use reth_triedb_common::TrieDatabase;
+use rust_eth_triedb_common::TrieDatabase;
 
 /// PathDB implementation using RocksDB.
 pub struct PathDB {

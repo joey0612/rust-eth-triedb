@@ -3,7 +3,7 @@
 use auto_impl::auto_impl;
 
 /// Simple database trait for trie operations
-#[auto_impl(Box, Arc, Clone)]
+#[auto_impl(Box, Arc, Clone, Send + Sync + Debug + Unpin + 'static)]
 pub trait TrieDatabase {
     /// Associated error type for database operations
     type Error;

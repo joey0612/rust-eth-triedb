@@ -1,7 +1,7 @@
 //! Secure trie identifier and builder implementation.
 
 use alloy_primitives::B256;
-use reth_triedb_common::TrieDatabase;
+use rust_eth_triedb_common::TrieDatabase;
 use thiserror::Error;
 use alloy_trie::EMPTY_ROOT_HASH;
 use super::state_trie::StateTrie;

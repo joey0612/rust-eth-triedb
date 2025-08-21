@@ -3,8 +3,8 @@
 use std::sync::Arc;
 use std::collections::HashMap;
 use alloy_primitives::{B256, Address};
-use reth_triedb_state_trie::account::StateAccount;
-use reth_triedb_state_trie::node::MergedNodeSet;
+use rust_eth_triedb_state_trie::account::StateAccount;
+use rust_eth_triedb_state_trie::node::MergedNodeSet;
 
 /// Error type for trie database operations
 pub type TrieDBError = super::triedb::TrieDBError;

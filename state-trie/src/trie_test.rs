@@ -1,7 +1,7 @@
 //! Trie tests for update and get operations.
 
 use alloy_primitives::{B256, keccak256};
-use reth_triedb_pathdb::{PathDB, PathProviderConfig};
+use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
 use crate::secure_trie::{SecureTrieBuilder, SecureTrieId};
 use crate::traits::SecureTrieTrait;
 
@@ -1780,7 +1780,7 @@ fn test_hash_slice_explanation() {
 
 #[test]
 fn test_key_to_nibbles_bsc_compatibility() {
-    use reth_triedb_memorydb::MemoryDB;
+    use rust_eth_triedb_memorydb::MemoryDB;
     use crate::trie::Trie;
     use alloy_primitives::hex;
 
@@ -1875,7 +1875,7 @@ fn test_key_to_nibbles_bsc_compatibility() {
 
 #[test]
 fn test_update_and_get_storage_basic() {
-    use reth_triedb_memorydb::MemoryDB;
+    use rust_eth_triedb_memorydb::MemoryDB;
     use crate::state_trie::StateTrie;
     use crate::secure_trie::SecureTrieId;
     use alloy_primitives::{Address, B256};
@@ -1899,7 +1899,7 @@ fn test_update_and_get_storage_basic() {
 
 #[test]
 fn test_update_and_get_storage_various_sizes() {
-    use reth_triedb_memorydb::MemoryDB;
+    use rust_eth_triedb_memorydb::MemoryDB;
     use crate::state_trie::StateTrie;
     use crate::secure_trie::SecureTrieId;
     use alloy_primitives::{Address, B256};
@@ -1923,7 +1923,7 @@ fn test_update_and_get_storage_various_sizes() {
 
 #[test]
 fn test_committer_parallel_equivalence() {
-    use reth_triedb_pathdb::{PathDB, PathProviderConfig};
+    use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
     use crate::secure_trie::{SecureTrieBuilder, SecureTrieId};
     use crate::trie_committer::Committer;
     use std::sync::{Arc, Mutex};

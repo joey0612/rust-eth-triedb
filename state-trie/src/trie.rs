@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use alloy_primitives::{B256};
 use alloy_trie::EMPTY_ROOT_HASH;
-use reth_triedb_common::TrieDatabase;
+use rust_eth_triedb_common::TrieDatabase;
 
 use crate::trie_committer::Committer;
 

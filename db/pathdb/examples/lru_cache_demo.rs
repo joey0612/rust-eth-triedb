@@ -1,4 +1,4 @@
-use reth_triedb_pathdb::{PathDB, PathProviderConfig, PathProvider};
+use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig, PathProvider};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== PathDB LRU Cache Demo ===");

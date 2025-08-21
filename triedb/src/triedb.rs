@@ -5,12 +5,12 @@ use std::collections::HashMap;
 use rayon::prelude::*;
 
 use alloy_primitives::{keccak256, Address, B256};
-use reth_triedb_common::TrieDatabase;
-use reth_triedb_state_trie::node::{MergedNodeSet, NodeSet};
-use reth_triedb_state_trie::state_trie::StateTrie;
-use reth_triedb_state_trie::account::StateAccount;
-use reth_triedb_state_trie::{SecureTrieId, SecureTrieTrait, SecureTrieBuilder};
-use reth_triedb_state_trie::encoding::{account_trie_node_key, storage_trie_node_key};
+use rust_eth_triedb_common::TrieDatabase;
+use rust_eth_triedb_state_trie::node::{MergedNodeSet, NodeSet};
+use rust_eth_triedb_state_trie::state_trie::StateTrie;
+use rust_eth_triedb_state_trie::account::StateAccount;
+use rust_eth_triedb_state_trie::{SecureTrieId, SecureTrieTrait, SecureTrieBuilder};
+use rust_eth_triedb_state_trie::encoding::{account_trie_node_key, storage_trie_node_key};
 
 use super::traits::TrieDBTrait;
 
@@ -30,7 +30,7 @@ pub enum TrieDBError {
     NotSupported(String),
     
     #[error("State trie error: {0}")]
-    StateTrie(#[from] reth_triedb_state_trie::secure_trie::SecureTrieError),
+    StateTrie(#[from] rust_eth_triedb_state_trie::secure_trie::SecureTrieError),
 }
 
 /// Trie database implementation

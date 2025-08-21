@@ -166,7 +166,7 @@ mod tests {
     use super::*;
     use crate::secure_trie::{SecureTrieBuilder, SecureTrieId};
     use crate::trie::Trie;
-    use reth_triedb_pathdb::{PathDB, PathProviderConfig};
+    use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
     use std::env;
     use alloy_primitives::{B256, keccak256};
 
@@ -395,7 +395,7 @@ mod tests {
         println!("   - Keys per batch: 100,000");
         println!("   - Delete per batch: 20,000");
 
-        let db = reth_triedb_memorydb::MemoryDB::default();
+        let db = rust_eth_triedb_memorydb::MemoryDB::default();
         let id = SecureTrieId::new(B256::ZERO);
 
         let mut state_trie = SecureTrieBuilder::new(db.clone())

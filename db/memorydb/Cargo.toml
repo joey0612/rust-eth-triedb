@@ -1,5 +1,5 @@
 [package]
-name = "reth-triedb-memorydb"
+name = "rust-eth-triedb-memorydb"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,7 +12,7 @@ description = "In-memory database implementation for reth trie"
 workspace = true
 
 [dependencies]
-reth-triedb-common.workspace = true
+rust-eth-triedb-common.workspace = true
 
 # alloy
 alloy-primitives.workspace = true

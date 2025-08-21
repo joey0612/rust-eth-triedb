@@ -2,9 +2,9 @@ use crate::bsc_wrapper::BscStateTrie;
 use alloy_primitives::{Address, B256, U256};
 use rand::Rng;
 // use reth_primitives_traits::Account;
-use reth_triedb_pathdb::{PathDB, PathProviderConfig};
-use reth_triedb_state_trie::{SecureTrieId, SecureTrieTrait, account::{StateAccount}};
-use reth_triedb_state_trie::state_trie::StateTrie;
+use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
+use rust_eth_triedb_state_trie::{SecureTrieId, SecureTrieTrait, account::{StateAccount}};
+use rust_eth_triedb_state_trie::state_trie::StateTrie;
 use std::collections::HashMap;
 use tempfile::TempDir;
 use thiserror::Error;
@@ -17,9 +17,9 @@ pub enum SmokeTestError {
     #[error("Failed to create temporary directory: {0}")]
     TempDirError(#[from] std::io::Error),
     #[error("PathDB error: {0}")]
-    PathDBError(#[from] reth_triedb_pathdb::PathProviderError),
+    PathDBError(#[from] rust_eth_triedb_pathdb::PathProviderError),
     #[error("StateTrie error: {0}")]
-    StateTrieError(#[from] reth_triedb_state_trie::SecureTrieError),
+    StateTrieError(#[from] rust_eth_triedb_state_trie::SecureTrieError),
     #[error("Root mismatch: BSC={0:?}, Reth={1:?}")]
     RootMismatch(B256, B256),
 }
