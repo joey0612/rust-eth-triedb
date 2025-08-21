@@ -2,10 +2,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::str::FromStr;
 use alloy_primitives::{keccak256, Address, B256};
+use alloy_trie::{EMPTY_ROOT_HASH};
 use rust_eth_triedb_state_trie::account::StateAccount;
 use rust_eth_triedb_state_trie::node::MergedNodeSet;
 use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
-use crate::{TrieDB, TrieDBTrait, TrieDBError, EMPTY_ROOT_HASH};
+use crate::{TrieDB, TrieDBError};
 use tempfile::TempDir;
 use once_cell::sync::Lazy;
 

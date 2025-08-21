@@ -5,17 +5,13 @@ use std::collections::HashMap;
 use rayon::prelude::*;
 
 use alloy_primitives::{keccak256, Address, B256};
+use alloy_trie::{EMPTY_ROOT_HASH};
 use rust_eth_triedb_common::TrieDatabase;
 use rust_eth_triedb_state_trie::node::{MergedNodeSet, NodeSet};
 use rust_eth_triedb_state_trie::state_trie::StateTrie;
 use rust_eth_triedb_state_trie::account::StateAccount;
 use rust_eth_triedb_state_trie::{SecureTrieId, SecureTrieTrait, SecureTrieBuilder};
 use rust_eth_triedb_state_trie::encoding::{account_trie_node_key, storage_trie_node_key};
-
-use super::traits::TrieDBTrait;
-
-/// Empty root hash constant
-pub const EMPTY_ROOT_HASH: B256 = B256::ZERO;
 
 /// Error type for trie database operations
 #[derive(Debug, thiserror::Error)]
@@ -136,14 +132,12 @@ where
     }
 }
 
-impl<DB> TrieDBTrait for TrieDB<DB>
+impl<DB> TrieDB<DB>
 where
     DB: TrieDatabase + Clone + Send + Sync,
     DB::Error: std::fmt::Debug,
 {
-    type Error = TrieDBError;
-
-    fn state_at(&mut self, root_hash: B256, difflayer: Option<Arc<MergedNodeSet>>) -> Result<Self, Self::Error> {
+    pub fn state_at(&mut self, root_hash: B256, difflayer: Option<Arc<MergedNodeSet>>) -> Result<Self, TrieDBError> {
         let id = SecureTrieId::new(root_hash);
         self.account_trie = SecureTrieBuilder::new(self.db.clone())
         .with_id(id)
@@ -156,61 +150,61 @@ where
         Ok(self.clone())
     }
 
-    fn get_account(&mut self, address: Address) -> Result<Option<StateAccount>, Self::Error> {
+    pub fn get_account(&mut self, address: Address) -> Result<Option<StateAccount>, TrieDBError> {
         Ok(self.account_trie.get_account(address)?)
     }
 
-    fn update_account(&mut self, address: Address, account: &StateAccount) -> Result<(), Self::Error> {
+    pub fn update_account(&mut self, address: Address, account: &StateAccount) -> Result<(), TrieDBError> {
         Ok(self.account_trie.update_account(address, account)?)
     }
 
-    fn delete_account(&mut self, address: Address) -> Result<(), Self::Error> {
+    pub fn delete_account(&mut self, address: Address) -> Result<(), TrieDBError> {
         Ok(self.account_trie.delete_account(address)?)
     }
 
-    fn get_storage(&mut self, address: Address, key: &[u8]) -> Result<Option<Vec<u8>>, Self::Error> {
+    pub fn get_storage(&mut self, address: Address, key: &[u8]) -> Result<Option<Vec<u8>>, TrieDBError> {
         let mut storage_trie = self.get_storage_trie(address)?;
         Ok(storage_trie.get_storage(address, key)?)
     }
 
-    fn update_storage(&mut self, address: Address, key: &[u8], value: &[u8]) -> Result<(), Self::Error> {
+    pub fn update_storage(&mut self, address: Address, key: &[u8], value: &[u8]) -> Result<(), TrieDBError> {
         let mut storage_trie = self.get_storage_trie(address)?;
         Ok(storage_trie.update_storage(address, key, value)?)
     }
 
-    fn delete_storage(&mut self, address: Address, key: &[u8]) -> Result<(), Self::Error> {
+    pub fn delete_storage(&mut self, address: Address, key: &[u8]) -> Result<(), TrieDBError> {
         let mut storage_trie = self.get_storage_trie(address)?;
         Ok(storage_trie.delete_storage(address, key)?)
     }
 
-    fn get_account_with_hash_state(&mut self, hashed_address: B256) -> Result<Option<StateAccount>, Self::Error> {
+    pub fn get_account_with_hash_state(&mut self, hashed_address: B256) -> Result<Option<StateAccount>, TrieDBError> {
         Ok(self.account_trie.get_account_with_hash_state(hashed_address)?)
     }
 
-    fn update_account_with_hash_state(&mut self, hashed_address: B256, account: &StateAccount) -> Result<(), Self::Error> {
+    pub fn update_account_with_hash_state(&mut self, hashed_address: B256, account: &StateAccount) -> Result<(), TrieDBError> {
         Ok(self.account_trie.update_account_with_hash_state(hashed_address, account)?)
     }
     
-    fn delete_account_with_hash_state(&mut self, hashed_address: B256) -> Result<(), Self::Error> {
+    pub fn delete_account_with_hash_state(&mut self, hashed_address: B256) -> Result<(), TrieDBError> {
         Ok(self.account_trie.delete_account_with_hash_state(hashed_address)?)
     }
 
-    fn get_storage_with_hash_state(&mut self, hashed_address: B256, hashed_key: B256) -> Result<Option<Vec<u8>>, Self::Error> {
+    pub fn get_storage_with_hash_state(&mut self, hashed_address: B256, hashed_key: B256) -> Result<Option<Vec<u8>>, TrieDBError> {
         let mut storage_trie = self.get_storage_trie_with_hash_state(hashed_address)?;
         Ok(storage_trie.get_storage_with_hash_state(hashed_address, hashed_key)?)
     }
 
-    fn update_storage_with_hash_state(&mut self, hashed_address: B256, hashed_key: B256, value: &[u8]) -> Result<(), Self::Error> {
+    pub fn update_storage_with_hash_state(&mut self, hashed_address: B256, hashed_key: B256, value: &[u8]) -> Result<(), TrieDBError> {
         let mut storage_trie = self.get_storage_trie_with_hash_state(hashed_address)?;
         Ok(storage_trie.update_storage_with_hash_state(hashed_address, hashed_key, value)?)
     }
 
-    fn delete_storage_with_hash_state(&mut self, hashed_address: B256, hashed_key: B256) -> Result<(), Self::Error> {
+    pub fn delete_storage_with_hash_state(&mut self, hashed_address: B256, hashed_key: B256) -> Result<(), TrieDBError> {
         let mut storage_trie = self.get_storage_trie_with_hash_state(hashed_address)?;
         Ok(storage_trie.delete_storage_with_hash_state(hashed_address, hashed_key)?)
     }
 
-    fn calculate_hash(&mut self) -> Result<B256, Self::Error> {
+    pub fn calculate_hash(&mut self) -> Result<B256, TrieDBError> {
         let storage_hashes: HashMap<B256, B256> = self.storage_tries
         .par_iter()
         .map(|(key, trie)| (*key, trie.clone().hash()))
@@ -229,7 +223,7 @@ where
         Ok(self.account_trie.hash())
     }
 
-    fn commit(&mut self, _collect_leaf: bool) -> Result<(B256, Arc<MergedNodeSet>), Self::Error> {
+    pub fn commit(&mut self, _collect_leaf: bool) -> Result<(B256, Arc<MergedNodeSet>), TrieDBError> {
         let root_hash = self.calculate_hash()?;
 
         let mut merged_node_set = MergedNodeSet::new();
@@ -263,7 +257,7 @@ where
         Ok((root_hash, Arc::new(merged_node_set))) 
     }
     
-    fn update_and_commit(
+    pub fn update_and_commit(
         &mut self, 
         root_hash: B256, 
         difflayer: Option<Arc<MergedNodeSet>>, 
@@ -355,7 +349,7 @@ where
         Ok((root_hash, Some(node_set)))
     }
 
-    fn flush(&mut self, update_nodes: Option<Arc<MergedNodeSet>>) -> Result<(), Self::Error> {
+    pub fn flush(&mut self, update_nodes: Option<Arc<MergedNodeSet>>) -> Result<(), TrieDBError> {
         if update_nodes.is_none() {
             return Ok(());
         }

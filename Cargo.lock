@@ -1503,6 +1503,7 @@ name = "rust-eth-triedb"
 version = "0.1.0"
 dependencies = [
  "alloy-primitives",
+ "alloy-trie",
  "once_cell",
  "rayon",
  "rust-eth-triedb-common",
