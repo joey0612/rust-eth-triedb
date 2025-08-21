@@ -31,12 +31,16 @@ pretty_assertions = "1.4"
 rayon = "1.8"
 rand = "0.8"
 hex = "0.4"
-rocksdb = "0.21"
+rocksdb = "0.24"
 tracing = "0.1"
 schnellru = "0.2"
 tempfile = "3.8"
+tikv-jemallocator = "0.6"
 rust-eth-triedb-common = { version = "0.1.0", path = "common" }
 rust-eth-triedb-memorydb = { version = "0.1.0", path = "db/memorydb" }
 rust-eth-triedb-pathdb = { version = "0.1.0", path = "db/pathdb" }
 rust-eth-triedb-state-trie = { version = "0.1.0", path = "state-trie" }
+
+[workspace.features]
+jemalloc = ["tikv-jemallocator"]
 

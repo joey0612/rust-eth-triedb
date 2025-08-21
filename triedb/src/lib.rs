@@ -1,5 +1,8 @@
 //! Trie database library for Ethereum state management.
 
+// Note: Global allocator is configured by the parent project (reth-bsc)
+// This crate supports jemalloc feature for dependency resolution but doesn't define global allocator
+
 pub mod traits;
 pub mod triedb;
 

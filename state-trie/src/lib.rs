@@ -4,6 +4,8 @@
 //! In a secure trie, all access operations hash the key using keccak256 to prevent calling code
 //! from creating long chains of nodes that increase access time.
 
+// Note: Global allocator is configured in the main triedb crate to avoid conflicts
+// This crate still supports jemalloc feature for dependency resolution
 
 /// Key encoding utilities for trie operations
 pub mod encoding;
