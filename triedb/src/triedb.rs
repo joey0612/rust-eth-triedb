@@ -48,6 +48,23 @@ where
     db: DB,
 }
 
+impl<DB> std::fmt::Debug for TrieDB<DB>
+where
+    DB: TrieDatabase + Clone + Send + Sync + std::fmt::Debug,
+    DB::Error: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TrieDB")
+            .field("root_hash", &self.root_hash)
+            .field("account_trie", &format!("<StateTrie<{}>>", std::any::type_name::<DB>()))
+            .field("storage_tries_count", &self.storage_tries.len())
+            .field("accounts_with_storage_trie_count", &self.accounts_with_storage_trie.len())
+            .field("difflayer", &self.difflayer.as_ref().map(|_| "<MergedNodeSet>"))
+            .field("db", &format!("<{}>", std::any::type_name::<DB>()))
+            .finish()
+    }
+}
+
 impl<DB> TrieDB<DB>
 where
     DB: TrieDatabase + Clone + Send + Sync,
