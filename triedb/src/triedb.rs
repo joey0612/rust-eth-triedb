@@ -7,11 +7,10 @@ use rayon::prelude::*;
 use alloy_primitives::{keccak256, Address, B256};
 use alloy_trie::{EMPTY_ROOT_HASH};
 use rust_eth_triedb_common::TrieDatabase;
-use rust_eth_triedb_state_trie::node::{MergedNodeSet, NodeSet};
+use rust_eth_triedb_state_trie::node::{MergedNodeSet, NodeSet, DiffLayer};
 use rust_eth_triedb_state_trie::state_trie::StateTrie;
 use rust_eth_triedb_state_trie::account::StateAccount;
 use rust_eth_triedb_state_trie::{SecureTrieId, SecureTrieTrait, SecureTrieBuilder};
-use rust_eth_triedb_state_trie::encoding::{account_trie_node_key, storage_trie_node_key};
 
 /// Error type for trie database operations
 #[derive(Debug, thiserror::Error)]
@@ -40,7 +39,7 @@ where
     account_trie: StateTrie<DB>,
     storage_tries: HashMap<B256, StateTrie<DB>>,
     accounts_with_storage_trie: HashMap<B256, StateAccount>,
-    difflayer: Option<Arc<MergedNodeSet>>,
+    difflayer: Option<Arc<DiffLayer>>,
     db: DB,
 }
 
@@ -137,7 +136,7 @@ where
     DB: TrieDatabase + Clone + Send + Sync,
     DB::Error: std::fmt::Debug,
 {
-    pub fn state_at(&mut self, root_hash: B256, difflayer: Option<Arc<MergedNodeSet>>) -> Result<Self, TrieDBError> {
+    pub fn state_at(&mut self, root_hash: B256, difflayer: Option<Arc<DiffLayer>>) -> Result<Self, TrieDBError> {
         let id = SecureTrieId::new(root_hash);
         self.account_trie = SecureTrieBuilder::new(self.db.clone())
         .with_id(id)
@@ -260,7 +259,7 @@ where
     pub fn update_and_commit(
         &mut self, 
         root_hash: B256, 
-        difflayer: Option<Arc<MergedNodeSet>>, 
+        difflayer: Option<Arc<DiffLayer>>, 
         states: HashMap<B256, Option<StateAccount>>, 
         storage_states: HashMap<B256, HashMap<B256, Option<Vec<u8>>>>) -> Result<(B256, Option<Arc<MergedNodeSet>>), TrieDBError> {
         
@@ -349,25 +348,18 @@ where
         Ok((root_hash, Some(node_set)))
     }
 
-    pub fn flush(&mut self, update_nodes: Option<Arc<MergedNodeSet>>) -> Result<(), TrieDBError> {
+    pub fn flush(&mut self, update_nodes: Option<Arc<DiffLayer>>) -> Result<(), TrieDBError> {
         if update_nodes.is_none() {
             return Ok(());
         }
-        let nodes = update_nodes.unwrap();
-        for (owner, node_set) in nodes.flatten() {
-            for (path, node) in node_set {
-                let key = if owner == B256::ZERO {
-                    account_trie_node_key(path.as_bytes())
-                } else {
-                    storage_trie_node_key(owner.as_slice(), path.as_bytes())
-                };
 
-                if node.is_deleted() {
-                    self.db.remove(&key);
-                } else {
-                    self.db.insert(&key, node.blob.unwrap())
-                        .map_err(|e| TrieDBError::Database(format!("Failed to insert node: {:?}", e)))?;
-                }
+        let difflayer = update_nodes.unwrap();
+        for (key, node) in difflayer.as_ref() {
+            if node.is_deleted() {
+                self.db.remove(&key);
+            } else {
+                self.db.insert(&key, node.blob.as_ref().unwrap().clone())
+                    .map_err(|e| TrieDBError::Database(format!("Failed to insert node: {:?}", e)))?;
             }
         }
         Ok(())

@@ -121,7 +121,8 @@ fn test_update_all_initial(triedb: &mut TrieDB<PathDB>) -> Result<(B256, Option<
 
             // Call flush and print hash
             if let Some(nodes) = node_set {
-                let flush_result = triedb.flush(Some(nodes.clone()));
+                let difflayer = nodes.to_difflayer();
+                let flush_result = triedb.flush(Some(difflayer));
                 match flush_result {
                     Ok(()) => println!("flush executed successfully"),
                     Err(e) => println!("flush failed: {:?}", e),
@@ -182,6 +183,7 @@ fn test_update_all_modifications(root_hash: B256, difflayer: Option<Arc<MergedNo
     println!("Preparing to delete {} accounts", 10);
     println!("Preparing to update {} storage states", storage_states.len());
     
+    let difflayer = difflayer.as_ref().map(|d| d.to_difflayer());
     // Call update_all interface
     let result = triedb.update_and_commit(root_hash, difflayer, states, storage_states);
     
@@ -194,9 +196,9 @@ fn test_update_all_modifications(root_hash: B256, difflayer: Option<Arc<MergedNo
             println!("✅ Root hash assertion passed: matches BSC implementation, root hash: {:?}", root_hash);
             
             // Assert that the NodeSet signatures match BSC implementation and call flush
-            if let Some(nodes) = node_set {
+            if let Some(node_sets) = node_set {
                 // First, verify signatures
-                for (owner, nodes) in nodes.sets.iter() {                    
+                for (owner, nodes) in node_sets.sets.iter() {                    
                     if let Some(expected_signature) = BSC_SIGNATURES_TWO.get(owner) {
                         assert_eq!(
                             nodes.signature(), 
@@ -210,8 +212,9 @@ fn test_update_all_modifications(root_hash: B256, difflayer: Option<Arc<MergedNo
                 }
                 println!("✅ NodeSet signature assertion passed: matches BSC implementation");
                 
+                let difflayer = node_sets.to_difflayer();
                 // Call flush and print hash
-                let flush_result = triedb.flush(Some(nodes));
+                let flush_result = triedb.flush(Some(difflayer));
                 match flush_result {
                     Ok(()) => println!("Modification flush executed successfully"),
                     Err(e) => println!("Modification flush failed: {:?}", e),

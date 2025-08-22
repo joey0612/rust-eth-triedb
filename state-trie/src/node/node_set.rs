@@ -4,8 +4,10 @@
 //! have been modified during trie operations, enabling efficient batch commits.
 
 use std::sync::Arc;
-use alloy_primitives::B256;
 use std::collections::HashMap;
+
+use alloy_primitives::B256;
+use crate::encoding;
 
 /// Represents a trie node with its hash and encoded data
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -299,6 +301,9 @@ impl std::fmt::Debug for NodeSet {
     }
 }
 
+/// Alias for difflayer node mapping
+pub type DiffLayer = HashMap<Vec<u8>, TrieNode>;
+
 /// MergedNodeSet is a set of node sets that are merged together.
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -336,6 +341,23 @@ impl MergedNodeSet {
             nodes.insert(*owner, set.nodes.clone());
         }
         nodes
+    }
+
+    /// Convert the merged node set to a difflayer
+    pub fn to_difflayer(&self) -> Arc<DiffLayer> {
+        let mut difflayer = DiffLayer::new();
+        for (owner, set) in &self.sets {
+            for (path, node) in &set.nodes {
+                if owner == &B256::ZERO {
+                    let key = encoding::account_trie_node_key(path.as_bytes());
+                    difflayer.insert(key, node.clone());
+                } else {
+                    let key = encoding::storage_trie_node_key(owner.as_slice(), path.as_bytes());
+                    difflayer.insert(key, node.clone());
+                }
+            }
+        }
+        Arc::new(difflayer)
     }
 }
 

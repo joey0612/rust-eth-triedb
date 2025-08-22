@@ -10,7 +10,7 @@ use super::account::StateAccount;
 use super::secure_trie::{SecureTrieId, SecureTrieError};
 use super::traits::SecureTrieTrait;
 use super::trie::Trie;
-use super::node::{NodeSet, MergedNodeSet};
+use super::node::{NodeSet, DiffLayer};
 use super::node::rlp_raw;
 
 /// State trie implementation that wraps a trie with secure key hashing
@@ -83,7 +83,7 @@ where
         &self.id
     }
 
-    fn with_difflayer(&mut self, difflayer: Option<Arc<MergedNodeSet>>) -> Result<(), Self::Error> {
+    fn with_difflayer(&mut self, difflayer: Option<Arc<DiffLayer>>) -> Result<(), Self::Error> {
         self.trie.with_difflayer(difflayer)?;
         Ok(())
     }
