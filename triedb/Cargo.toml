@@ -17,7 +17,12 @@ jemalloc = ["tikv-jemallocator"]
 rust-eth-triedb-state-trie.workspace = true
 rust-eth-triedb-common.workspace = true
 rust-eth-triedb-pathdb.workspace = true
+
+#alloy
 alloy-trie.workspace = true
+
+#reth
+reth-trie-common.workspace = true
 
 # External dependencies
 alloy-primitives = { workspace = true, features = ["asm-keccak"] }
