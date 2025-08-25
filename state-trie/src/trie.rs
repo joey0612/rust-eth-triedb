@@ -750,7 +750,7 @@ where
             return Ok(node);
         }
 
-        return Ok(Arc::new(Node::EmptyRoot))
+        return Err(SecureTrieError::Database(format!("Node not found in database: owner: {:?}, prefix: {:?}", self.owner, prefix)));
     }
 
 }
