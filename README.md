@@ -18,6 +18,11 @@ High-performance Trie/DB implementations for Ethereum state (MPT), fully compati
   - Commit phase aggregates and writes nodes in parallel
   - Updates/commits across tries/backends can be pipelined for higher throughput
 
+- **Jemalloc support (optional)**
+  - Enable jemalloc memory allocator for better performance and memory management
+  - Use `--features jemalloc` to enable during compilation
+  - Provides improved memory fragmentation handling and multi-threaded performance
+
 ### Project layout
 
 - `common/`: shared interfaces and types (e.g., `TrieDatabase` abstraction)
@@ -32,7 +37,11 @@ High-performance Trie/DB implementations for Ethereum state (MPT), fully compati
 1) Build
 
 ```bash
+# Standard build
 cargo build --workspace
+
+# Build with jemalloc support (recommended for production)
+cargo build --workspace --features jemalloc
 ```
 
 2) Smoke Test (random updates and deletes, compare the root hash with geth)

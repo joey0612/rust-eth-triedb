@@ -4,7 +4,7 @@ use std::{sync::Arc};
 
 use alloy_primitives::{Address, B256};
 use super::account::StateAccount;
-use super::node::{NodeSet, MergedNodeSet};
+use super::node::{NodeSet, DiffLayer};
 
 /// Error type for secure trie operations
 pub type SecureTrieError = super::secure_trie::SecureTrieError;
@@ -18,7 +18,7 @@ pub trait SecureTrieTrait {
     fn id(&self) -> &super::secure_trie::SecureTrieId;
 
     /// Sets the difflayer for the trie
-    fn with_difflayer(&mut self, difflayer: Option<Arc<MergedNodeSet>>) -> Result<(), Self::Error>;
+    fn with_difflayer(&mut self, difflayer: Option<Arc<DiffLayer>>) -> Result<(), Self::Error>;
 
     /// Gets an account from the trie by address
     fn get_account(&mut self, address: Address) -> Result<Option<StateAccount>, Self::Error>;

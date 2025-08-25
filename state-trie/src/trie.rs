@@ -9,7 +9,7 @@ use rust_eth_triedb_common::TrieDatabase;
 use crate::trie_committer::Committer;
 
 use super::encoding::{common_prefix_length, key_to_nibbles, account_trie_node_key, storage_trie_node_key};
-use super::node::{Node, NodeFlag, FullNode, ShortNode, NodeSet, TrieNode, MergedNodeSet};
+use super::node::{Node, NodeFlag, FullNode, ShortNode, NodeSet, TrieNode, DiffLayer};
 use super::secure_trie::{SecureTrieId, SecureTrieError};
 use super::trie_hasher::Hasher;
 use super::trie_tracer::TrieTracer;
@@ -24,7 +24,7 @@ pub struct Trie<DB> {
     uncommitted: usize,
     pub tracer: TrieTracer,
     database: DB,
-    difflayer: Option<Arc<MergedNodeSet>>,
+    difflayer: Option<Arc<DiffLayer>>,
 }
 
 /// Basic Trie operations
@@ -34,7 +34,7 @@ where
     DB::Error: std::fmt::Debug,
 {
     /// Creates a new trie with the given identifier and database
-    pub fn new(id: &SecureTrieId, database: DB, difflayer: Option<Arc<MergedNodeSet>>) -> Result<Self, SecureTrieError> {
+    pub fn new(id: &SecureTrieId, database: DB, difflayer: Option<Arc<DiffLayer>>) -> Result<Self, SecureTrieError> {
         let mut tr = Self {
             root: Arc::new(Node::EmptyRoot),
             owner: id.owner,
@@ -61,7 +61,7 @@ where
     }
 
     /// Sets the difflayer for the trie
-    pub fn with_difflayer(&mut self, difflayer: Option<Arc<MergedNodeSet>>) -> Result<(), SecureTrieError> {
+    pub fn with_difflayer(&mut self, difflayer: Option<Arc<DiffLayer>>) -> Result<(), SecureTrieError> {
         self.difflayer = difflayer;
         Ok(())
     }
@@ -726,28 +726,22 @@ where
 
     /// Resolves a hash and tracks it in the difflayer
     fn resolve_and_track(&mut self, hash: &B256, prefix: &[u8]) -> Result<Arc<Node>, SecureTrieError> {
-        // 1. Check if the hash is in the difflayer
-        if let Some(difflayer) = &self.difflayer {
-            if difflayer.sets.contains_key(&self.owner) {
-                let path = String::from_utf8_lossy(prefix).to_string();
-                let node_set = difflayer.sets.get(&self.owner).unwrap();
-                if node_set.nodes.contains_key(&path) {
-                    let node = node_set.nodes.get(&path);
-                    if let Some(node) = node {
-                        if node.hash == Some(*hash) {
-                            self.tracer.on_read(prefix, node.blob.clone().unwrap());
-                            return Ok(Node::must_decode_node(Some(*hash), &node.blob.clone().unwrap()));
-                        }
-                    } 
-                }
-            }
-        }
-
         let key = if self.owner == B256::ZERO {
             account_trie_node_key(prefix)
         } else {
             storage_trie_node_key(self.owner.as_slice(), prefix)
         };
+        
+        // 1. Check if the hash is in the difflayer
+        if let Some(difflayer) = &self.difflayer {
+            if difflayer.contains_key(&key) {
+                let node = difflayer.get(&key).unwrap();
+                if node.hash == Some(*hash) {
+                    self.tracer.on_read(prefix, node.blob.clone().unwrap());
+                    return Ok(Node::must_decode_node(Some(*hash), &node.blob.clone().unwrap()));
+                }
+            }
+        }
 
         // 2. Check if the hash is in the database
         if let Some(node_blob) = self.database.get(&key).map_err(|e| SecureTrieError::Database(format!("{:?}", e)))? {
@@ -756,7 +750,7 @@ where
             return Ok(node);
         }
 
-        return Ok(Arc::new(Node::EmptyRoot))
+        return Err(SecureTrieError::Database(format!("Node not found in database: owner: {:?}, prefix: {:?}", self.owner, prefix)));
     }
 
 }

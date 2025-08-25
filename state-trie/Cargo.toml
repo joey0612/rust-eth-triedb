@@ -19,7 +19,7 @@ rust-eth-triedb-pathdb.workspace = true
 rust-eth-triedb-common.workspace = true
 
 # alloy
-alloy-primitives.workspace = true
+alloy-primitives = { workspace = true, features = ["asm-keccak"] }
 alloy-rlp.workspace = true
 alloy-trie.workspace = true
 
@@ -31,9 +31,13 @@ arbitrary = { version = "1.0", optional = true }
 rand.workspace = true
 hex.workspace = true
 
+# Jemalloc support
+tikv-jemallocator = { workspace = true, optional = true }
+
 [features]
 # serde = ["alloy-primitives/serde"]
 arbitrary = ["dep:arbitrary"]
+jemalloc = ["tikv-jemallocator"]
 
 [dev-dependencies]
 # reth

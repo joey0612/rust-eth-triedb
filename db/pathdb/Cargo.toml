@@ -8,15 +8,19 @@ homepage.workspace = true
 repository.workspace = true
 description = "PathDB implementation for RocksDB integration"
 
+[features]
+default = []
+jemalloc = ["tikv-jemallocator"]
+
 [dependencies]
 # reth
 rust-eth-triedb-common.workspace = true
 
 # alloy
-alloy-primitives.workspace = true
+alloy-primitives = { workspace = true, features = ["asm-keccak"] }
 
 # RocksDB
-rocksdb.workspace = true
+rocksdb = { workspace = true, features = ["multi-threaded-cf", "io-uring", "lto", "jemalloc"] }
 
 # Error handling
 thiserror.workspace = true
@@ -29,6 +33,9 @@ schnellru.workspace = true
 
 # Testing
 tempfile.workspace = true
+
+# Jemalloc support
+tikv-jemallocator = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile.workspace = true

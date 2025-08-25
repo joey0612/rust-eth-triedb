@@ -1,21 +1,17 @@
 //! Trie database implementation.
 
 use std::sync::{Arc};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use rayon::prelude::*;
 
 use alloy_primitives::{keccak256, Address, B256};
+use alloy_trie::{EMPTY_ROOT_HASH};
+use reth_trie_common::HashedPostState;
 use rust_eth_triedb_common::TrieDatabase;
-use rust_eth_triedb_state_trie::node::{MergedNodeSet, NodeSet};
+use rust_eth_triedb_state_trie::node::{MergedNodeSet, NodeSet, DiffLayer};
 use rust_eth_triedb_state_trie::state_trie::StateTrie;
 use rust_eth_triedb_state_trie::account::StateAccount;
 use rust_eth_triedb_state_trie::{SecureTrieId, SecureTrieTrait, SecureTrieBuilder};
-use rust_eth_triedb_state_trie::encoding::{account_trie_node_key, storage_trie_node_key};
-
-use super::traits::TrieDBTrait;
-
-/// Empty root hash constant
-pub const EMPTY_ROOT_HASH: B256 = B256::ZERO;
 
 /// Error type for trie database operations
 #[derive(Debug, thiserror::Error)]
@@ -44,8 +40,25 @@ where
     account_trie: StateTrie<DB>,
     storage_tries: HashMap<B256, StateTrie<DB>>,
     accounts_with_storage_trie: HashMap<B256, StateAccount>,
-    difflayer: Option<Arc<MergedNodeSet>>,
+    difflayer: Option<Arc<DiffLayer>>,
     db: DB,
+}
+
+impl<DB> std::fmt::Debug for TrieDB<DB>
+where
+    DB: TrieDatabase + Clone + Send + Sync + std::fmt::Debug,
+    DB::Error: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TrieDB")
+            .field("root_hash", &self.root_hash)
+            .field("account_trie", &format!("<StateTrie<{}>>", std::any::type_name::<DB>()))
+            .field("storage_tries_count", &self.storage_tries.len())
+            .field("accounts_with_storage_trie_count", &self.accounts_with_storage_trie.len())
+            .field("difflayer", &self.difflayer.as_ref().map(|_| "<MergedNodeSet>"))
+            .field("db", &format!("<{}>", std::any::type_name::<DB>()))
+            .finish()
+    }
 }
 
 impl<DB> TrieDB<DB>
@@ -119,14 +132,12 @@ where
     }
 }
 
-impl<DB> TrieDBTrait for TrieDB<DB>
+impl<DB> TrieDB<DB>
 where
     DB: TrieDatabase + Clone + Send + Sync,
     DB::Error: std::fmt::Debug,
 {
-    type Error = TrieDBError;
-
-    fn state_at(&mut self, root_hash: B256, difflayer: Option<Arc<MergedNodeSet>>) -> Result<Self, Self::Error> {
+    pub fn state_at(&mut self, root_hash: B256, difflayer: Option<Arc<DiffLayer>>) -> Result<Self, TrieDBError> {
         let id = SecureTrieId::new(root_hash);
         self.account_trie = SecureTrieBuilder::new(self.db.clone())
         .with_id(id)
@@ -139,61 +150,61 @@ where
         Ok(self.clone())
     }
 
-    fn get_account(&mut self, address: Address) -> Result<Option<StateAccount>, Self::Error> {
+    pub fn get_account(&mut self, address: Address) -> Result<Option<StateAccount>, TrieDBError> {
         Ok(self.account_trie.get_account(address)?)
     }
 
-    fn update_account(&mut self, address: Address, account: &StateAccount) -> Result<(), Self::Error> {
+    pub fn update_account(&mut self, address: Address, account: &StateAccount) -> Result<(), TrieDBError> {
         Ok(self.account_trie.update_account(address, account)?)
     }
 
-    fn delete_account(&mut self, address: Address) -> Result<(), Self::Error> {
+    pub fn delete_account(&mut self, address: Address) -> Result<(), TrieDBError> {
         Ok(self.account_trie.delete_account(address)?)
     }
 
-    fn get_storage(&mut self, address: Address, key: &[u8]) -> Result<Option<Vec<u8>>, Self::Error> {
+    pub fn get_storage(&mut self, address: Address, key: &[u8]) -> Result<Option<Vec<u8>>, TrieDBError> {
         let mut storage_trie = self.get_storage_trie(address)?;
         Ok(storage_trie.get_storage(address, key)?)
     }
 
-    fn update_storage(&mut self, address: Address, key: &[u8], value: &[u8]) -> Result<(), Self::Error> {
+    pub fn update_storage(&mut self, address: Address, key: &[u8], value: &[u8]) -> Result<(), TrieDBError> {
         let mut storage_trie = self.get_storage_trie(address)?;
         Ok(storage_trie.update_storage(address, key, value)?)
     }
 
-    fn delete_storage(&mut self, address: Address, key: &[u8]) -> Result<(), Self::Error> {
+    pub fn delete_storage(&mut self, address: Address, key: &[u8]) -> Result<(), TrieDBError> {
         let mut storage_trie = self.get_storage_trie(address)?;
         Ok(storage_trie.delete_storage(address, key)?)
     }
 
-    fn get_account_with_hash_state(&mut self, hashed_address: B256) -> Result<Option<StateAccount>, Self::Error> {
+    pub fn get_account_with_hash_state(&mut self, hashed_address: B256) -> Result<Option<StateAccount>, TrieDBError> {
         Ok(self.account_trie.get_account_with_hash_state(hashed_address)?)
     }
 
-    fn update_account_with_hash_state(&mut self, hashed_address: B256, account: &StateAccount) -> Result<(), Self::Error> {
+    pub fn update_account_with_hash_state(&mut self, hashed_address: B256, account: &StateAccount) -> Result<(), TrieDBError> {
         Ok(self.account_trie.update_account_with_hash_state(hashed_address, account)?)
     }
     
-    fn delete_account_with_hash_state(&mut self, hashed_address: B256) -> Result<(), Self::Error> {
+    pub fn delete_account_with_hash_state(&mut self, hashed_address: B256) -> Result<(), TrieDBError> {
         Ok(self.account_trie.delete_account_with_hash_state(hashed_address)?)
     }
 
-    fn get_storage_with_hash_state(&mut self, hashed_address: B256, hashed_key: B256) -> Result<Option<Vec<u8>>, Self::Error> {
+    pub fn get_storage_with_hash_state(&mut self, hashed_address: B256, hashed_key: B256) -> Result<Option<Vec<u8>>, TrieDBError> {
         let mut storage_trie = self.get_storage_trie_with_hash_state(hashed_address)?;
         Ok(storage_trie.get_storage_with_hash_state(hashed_address, hashed_key)?)
     }
 
-    fn update_storage_with_hash_state(&mut self, hashed_address: B256, hashed_key: B256, value: &[u8]) -> Result<(), Self::Error> {
+    pub fn update_storage_with_hash_state(&mut self, hashed_address: B256, hashed_key: B256, value: &[u8]) -> Result<(), TrieDBError> {
         let mut storage_trie = self.get_storage_trie_with_hash_state(hashed_address)?;
         Ok(storage_trie.update_storage_with_hash_state(hashed_address, hashed_key, value)?)
     }
 
-    fn delete_storage_with_hash_state(&mut self, hashed_address: B256, hashed_key: B256) -> Result<(), Self::Error> {
+    pub fn delete_storage_with_hash_state(&mut self, hashed_address: B256, hashed_key: B256) -> Result<(), TrieDBError> {
         let mut storage_trie = self.get_storage_trie_with_hash_state(hashed_address)?;
         Ok(storage_trie.delete_storage_with_hash_state(hashed_address, hashed_key)?)
     }
 
-    fn calculate_hash(&mut self) -> Result<B256, Self::Error> {
+    pub fn calculate_hash(&mut self) -> Result<B256, TrieDBError> {
         let storage_hashes: HashMap<B256, B256> = self.storage_tries
         .par_iter()
         .map(|(key, trie)| (*key, trie.clone().hash()))
@@ -212,7 +223,7 @@ where
         Ok(self.account_trie.hash())
     }
 
-    fn commit(&mut self, _collect_leaf: bool) -> Result<(B256, Arc<MergedNodeSet>), Self::Error> {
+    pub fn commit(&mut self, _collect_leaf: bool) -> Result<(B256, Arc<MergedNodeSet>), TrieDBError> {
         let root_hash = self.calculate_hash()?;
 
         let mut merged_node_set = MergedNodeSet::new();
@@ -224,10 +235,7 @@ where
             || self.storage_tries
                 .par_iter()
                 .map(|(hashed_address, trie)| {
-                    let (root_hash, node_set) = trie.clone().commit(false).unwrap_or((B256::ZERO, None));
-                    if root_hash == EMPTY_ROOT_HASH || root_hash == B256::ZERO {
-                        panic!("storage root hash is empty");
-                    }
+                    let (_, node_set) = trie.clone().commit(false).unwrap_or((B256::ZERO, None));
                     (*hashed_address, node_set)
                 })
                 .collect()
@@ -246,11 +254,14 @@ where
         Ok((root_hash, Arc::new(merged_node_set))) 
     }
     
-    fn update_and_commit(
+    /// This function is used to implement update_and_commit_with_hashed_post_state
+    /// also compatibilize with Reth
+    pub fn update_and_commit(
         &mut self, 
         root_hash: B256, 
-        difflayer: Option<Arc<MergedNodeSet>>, 
-        states: HashMap<B256, Option<StateAccount>>, 
+        difflayer: Option<Arc<DiffLayer>>, 
+        states: HashMap<B256, Option<StateAccount>>,
+        states_rebuild: HashSet<B256>,
         storage_states: HashMap<B256, HashMap<B256, Option<Vec<u8>>>>) -> Result<(B256, Option<Arc<MergedNodeSet>>), TrieDBError> {
         
         // clear the trie db state
@@ -265,25 +276,31 @@ where
                 continue;
             }
 
-            let mut old_account = self.get_account_with_hash_state(hashed_address)?;
-            if old_account.is_some() {
-                old_account.unwrap().nonce = new_account.unwrap().nonce;
-                old_account.unwrap().balance = new_account.unwrap().balance;
-                old_account.unwrap().code_hash = new_account.unwrap().code_hash;
+            let final_account = if states_rebuild.contains(&hashed_address) {
+                new_account.unwrap()
+            } else if storage_states.contains_key(&hashed_address) {
+                new_account.unwrap()
             } else {
-                old_account = new_account;
-            }
+                let old_account = self.get_account_with_hash_state(hashed_address)?;            
+                match old_account {
+                    Some(mut acc) => {
+                        let new_account = new_account.unwrap();
+                        acc.nonce = new_account.nonce;
+                        acc.balance = new_account.balance;
+                        acc.code_hash = new_account.code_hash;
+                        acc
+                    }
+                    None => new_account.unwrap()
+                }
+            };
+            
             if storage_states.contains_key(&hashed_address) {
-                update_accounts_with_storage.insert(hashed_address, old_account.unwrap());
+                update_accounts_with_storage.insert(hashed_address, final_account);
             } else {
-                update_accounts.insert(hashed_address, old_account);
+                update_accounts.insert(hashed_address, Some(final_account));
             }
         }
         self.accounts_with_storage_trie = update_accounts_with_storage;
-
-        let accounts_with_storage_trie_len = self.accounts_with_storage_trie.len();
-        let storage_states_len = storage_states.len();
-        assert_eq!(accounts_with_storage_trie_len, storage_states_len);
 
         // Clone required data to avoid borrowing conflicts
         let accounts_clone = self.accounts_with_storage_trie.clone();
@@ -294,6 +311,11 @@ where
         let (_, update_storage): ((), HashMap<B256, StateTrie<DB>>) = rayon::join(
             || {
                 // Task 1: Update account trie (serial execution)
+                // delete accounts that are being rebuilt
+                for hashed_address in states_rebuild {
+                    self.delete_account_with_hash_state(hashed_address).unwrap();
+                }
+                // update accounts that are being updated
                 for (hashed_address, account) in update_accounts {
                     if account.is_some() {
                         self.update_account_with_hash_state(hashed_address, &account.unwrap()).unwrap();
@@ -322,7 +344,7 @@ where
                             if new_value.is_none() {
                                 storage_trie.delete_storage_with_hash_state(hashed_address, hashed_key).unwrap();
                             } else {
-                                storage_trie.update_storage_with_hash_state(hashed_address, hashed_key, new_value.unwrap().as_slice()).unwrap();
+                                storage_trie.update_storage_with_hash_state(hashed_address, hashed_key, &new_value.unwrap().as_slice()).unwrap();
                             }
                         }
 
@@ -338,25 +360,85 @@ where
         Ok((root_hash, Some(node_set)))
     }
 
-    fn flush(&mut self, update_nodes: Option<Arc<MergedNodeSet>>) -> Result<(), Self::Error> {
+    /// Update and commit with hashed post state
+    /// 
+    /// This function is used to update the trie db with the Reth's HashedPostState
+    pub fn update_and_commit_with_hashed_post_state(
+        &mut self, 
+        root_hash: B256, 
+        difflayer: Option<Arc<DiffLayer>>, 
+        hashed_post_state: HashedPostState) -> Result<(B256, Option<Arc<DiffLayer>>), TrieDBError> {
+
+        let mut states: HashMap<alloy_primitives::FixedBytes<32>, Option<StateAccount>> = HashMap::new();
+        let mut states_rebuild = HashSet::new();
+        let mut storage_states = HashMap::new();
+        
+        for (hashed_address, account) in hashed_post_state.accounts {
+            match account {
+                Some(account) => {
+                    let code_hash = match account.bytecode_hash {
+                        Some(code_hash) => code_hash,
+                        None => alloy_trie::KECCAK_EMPTY
+                    };
+                    let acc = StateAccount::default()
+                        .with_nonce(account.nonce)
+                        .with_balance(account.balance)
+                        .with_code_hash(code_hash);
+                    states.insert(hashed_address, Some(acc));
+
+                    if let Some(storages) = hashed_post_state.storages.get(&hashed_address) {
+                        if storages.wiped {
+                            states_rebuild.insert(hashed_address);
+                        }
+                    }
+                }
+                None => {
+                    states.insert(hashed_address, None);
+                }
+            }
+        }
+
+        for (hashed_address, storages) in hashed_post_state.storages {
+            if storages.storage.is_empty() {
+                continue;
+            }
+            let mut kvs = HashMap::new();
+            for (hashed_key, value) in storages.storage {
+                if value.is_zero() {
+                    kvs.insert(hashed_key, None);
+                } else {
+                    kvs.insert(hashed_key, Some(value.to_be_bytes::<32>().as_ref().to_vec()));
+                }
+            }
+            storage_states.insert(hashed_address, kvs);
+        }
+
+        let (root_hash, node_set) = self.update_and_commit(
+            root_hash, 
+            difflayer, 
+            states, 
+            states_rebuild, 
+            storage_states)?;
+
+        if let Some(node_set) = node_set {
+            let difflayer = node_set.to_difflayer();
+            return Ok((root_hash, Some(difflayer)));
+        } 
+        Ok((root_hash, None))
+    }
+
+    pub fn flush(&mut self, update_nodes: Option<Arc<DiffLayer>>) -> Result<(), TrieDBError> {
         if update_nodes.is_none() {
             return Ok(());
         }
-        let nodes = update_nodes.unwrap();
-        for (owner, node_set) in nodes.flatten() {
-            for (path, node) in node_set {
-                let key = if owner == B256::ZERO {
-                    account_trie_node_key(path.as_bytes())
-                } else {
-                    storage_trie_node_key(owner.as_slice(), path.as_bytes())
-                };
 
-                if node.is_deleted() {
-                    self.db.remove(&key);
-                } else {
-                    self.db.insert(&key, node.blob.unwrap())
-                        .map_err(|e| TrieDBError::Database(format!("Failed to insert node: {:?}", e)))?;
-                }
+        let difflayer = update_nodes.unwrap();
+        for (key, node) in difflayer.as_ref() {
+            if node.is_deleted() {
+                self.db.remove(&key);
+            } else {
+                self.db.insert(&key, node.blob.as_ref().unwrap().clone())
+                    .map_err(|e| TrieDBError::Database(format!("Failed to insert node: {:?}", e)))?;
             }
         }
         Ok(())

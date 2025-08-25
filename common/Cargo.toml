@@ -11,10 +11,17 @@ description = "Common traits and types for reth trie database implementations"
 [lints]
 workspace = true
 
+[features]
+default = []
+jemalloc = ["tikv-jemallocator"]
+
 [dependencies]
 # alloy
-alloy-primitives.workspace = true
+alloy-primitives = { workspace = true, features = ["asm-keccak"] }
 
 # misc
 auto_impl.workspace = true
 thiserror.workspace = true
+
+# Jemalloc support
+tikv-jemallocator = { workspace = true, optional = true }
