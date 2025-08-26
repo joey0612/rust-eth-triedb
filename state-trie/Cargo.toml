@@ -33,6 +33,7 @@ hex.workspace = true
 
 # Jemalloc support
 tikv-jemallocator = { workspace = true, optional = true }
+tracing.workspace = true
 
 [features]
 # serde = ["alloy-primitives/serde"]

@@ -24,7 +24,7 @@ fn test_trie_update_and_get() {
     // Create Trie instance
     let mut state_trie = SecureTrieBuilder::new(db.clone())
         .with_id(id.clone())
-        .build()
+        .build_with_difflayer(None)
         .expect("Failed to create trie");
 
     let trie = state_trie.trie_mut();
@@ -72,7 +72,7 @@ fn test_trie_multiple_updates() {
     // Create Trie instance
     let mut state_trie = SecureTrieBuilder::new(db.clone())
         .with_id(id.clone())
-        .build()
+        .build_with_difflayer(None)
         .expect("Failed to create trie");
 
     let trie = state_trie.trie_mut();
@@ -121,7 +121,7 @@ fn test_trie_update_overwrite() {
     // Create Trie instance
     let mut state_trie = SecureTrieBuilder::new(db.clone())
         .with_id(id.clone())
-        .build()
+        .build_with_difflayer(None)
         .expect("Failed to create trie");
 
     let trie = state_trie.trie_mut();
@@ -173,7 +173,7 @@ fn test_trie_nonexistent_key() {
     // Create Trie instance
     let mut state_trie = SecureTrieBuilder::new(db.clone())
         .with_id(id.clone())
-        .build()
+        .build_with_difflayer(None)
         .expect("Failed to create trie");
 
     let trie = state_trie.trie_mut();
@@ -212,7 +212,7 @@ fn test_trie_binary_data() {
     // Create Trie instance
     let mut state_trie = SecureTrieBuilder::new(db.clone())
         .with_id(id.clone())
-        .build()
+        .build_with_difflayer(None)
         .expect("Failed to create trie");
 
     let trie = state_trie.trie_mut();
@@ -250,7 +250,7 @@ fn test_trie_large_value() {
     // Create Trie instance
     let mut state_trie = SecureTrieBuilder::new(db.clone())
     .with_id(id.clone())
-    .build()
+    .build_with_difflayer(None)
     .expect("Failed to create trie");
 
     let trie = state_trie.trie_mut();
@@ -293,7 +293,7 @@ fn test_trie_smoke_test_10000_random_kv_update_get() {
     // Create Trie instance
     let mut state_trie = SecureTrieBuilder::new(db.clone())
         .with_id(id.clone())
-        .build()
+        .build_with_difflayer(None)
         .expect("Failed to create trie");
 
     let trie = state_trie.trie_mut();
@@ -412,7 +412,7 @@ fn test_trie_delete_basic() {
     // Create Trie instance
     let mut state_trie = SecureTrieBuilder::new(db.clone())
         .with_id(id.clone())
-        .build()
+        .build_with_difflayer(None)
         .expect("Failed to create trie");
 
     let trie = state_trie.trie_mut();
@@ -460,7 +460,7 @@ fn test_trie_delete_multiple() {
     // Create Trie instance
     let mut state_trie = SecureTrieBuilder::new(db.clone())
         .with_id(id.clone())
-        .build()
+        .build_with_difflayer(None)
         .expect("Failed to create trie");
 
     let trie = state_trie.trie_mut();
@@ -550,7 +550,7 @@ fn test_trie_delete_nonexistent() {
     // Create Trie instance
     let mut state_trie = SecureTrieBuilder::new(db.clone())
         .with_id(id.clone())
-        .build()
+        .build_with_difflayer(None)
         .expect("Failed to create trie");
 
     let trie = state_trie.trie_mut();
@@ -586,7 +586,7 @@ fn test_trie_delete_and_reinsert() {
     // Create Trie instance
     let mut state_trie = SecureTrieBuilder::new(db.clone())
         .with_id(id.clone())
-        .build()
+        .build_with_difflayer(None)
         .expect("Failed to create trie");
 
     let trie = state_trie.trie_mut();
@@ -647,7 +647,7 @@ fn test_trie_update_empty_value_equals_delete() {
     // Create Trie instance
     let mut state_trie = SecureTrieBuilder::new(db.clone())
         .with_id(id.clone())
-        .build()
+        .build_with_difflayer(None)
         .expect("Failed to create trie");
 
     let trie = state_trie.trie_mut();
@@ -761,7 +761,7 @@ fn test_trie_simple_write_delete_get() {
     // Create Trie instance
     let mut state_trie = SecureTrieBuilder::new(db.clone())
         .with_id(id.clone())
-        .build()
+        .build_with_difflayer(None)
         .expect("Failed to create trie");
 
     let trie = state_trie.trie_mut();
@@ -836,7 +836,7 @@ fn test_trie_simple_delete_verification() {
     // Create Trie instance
     let mut state_trie = SecureTrieBuilder::new(db.clone())
         .with_id(id.clone())
-        .build()
+        .build_with_difflayer(None)
         .expect("Failed to create trie");
 
     let trie = state_trie.trie_mut();
@@ -937,7 +937,7 @@ fn test_trie_phased_smoke_test_with_hash() {
     // Create Trie instance
     let mut state_trie = SecureTrieBuilder::new(db.clone())
         .with_id(id.clone())
-        .build()
+        .build_with_difflayer(None)
         .expect("Failed to create trie");
 
     let trie = state_trie.trie_mut();
@@ -1166,7 +1166,7 @@ fn test_trie_boundary_conditions_comprehensive() {
     // Create Trie instance
     let mut state_trie = SecureTrieBuilder::new(db.clone())
         .with_id(id.clone())
-        .build()
+        .build_with_difflayer(None)
         .expect("Failed to create trie");
 
     let trie = state_trie.trie_mut();
@@ -1515,7 +1515,7 @@ fn test_trie_systematic_batch_deletion() {
     // Create Trie instance
     let mut state_trie = SecureTrieBuilder::new(db.clone())
         .with_id(id.clone())
-        .build()
+        .build_with_difflayer(None)
         .expect("Failed to create trie");
 
     let trie = state_trie.trie_mut();
@@ -1883,7 +1883,7 @@ fn test_update_and_get_storage_basic() {
     // Create empty in-memory DB and StateTrie
     let db = MemoryDB::default();
     let id = SecureTrieId::new(B256::ZERO);
-    let mut state_trie: StateTrie<MemoryDB> = StateTrie::new(id, db).expect("create trie");
+    let mut state_trie: StateTrie<MemoryDB> = StateTrie::new(id, db, None).expect("create trie");
 
     let address = Address::ZERO;
     let key = b"storage_key";
@@ -1906,7 +1906,7 @@ fn test_update_and_get_storage_various_sizes() {
 
     let db = MemoryDB::default();
     let id = SecureTrieId::new(B256::ZERO);
-    let mut trie: StateTrie<MemoryDB> = StateTrie::new(id, db).expect("create trie");
+    let mut trie: StateTrie<MemoryDB> = StateTrie::new(id, db, None).expect("create trie");
 
     let addr = Address::ZERO;
     let key = b"size_key";
@@ -1940,8 +1940,14 @@ fn test_committer_parallel_equivalence() {
 
     // Build two identical StateTries
     let id = SecureTrieId::new(B256::ZERO);
-    let mut st1 = SecureTrieBuilder::new(db1.clone()).with_id(id.clone()).build().unwrap();
-    let mut st2 = SecureTrieBuilder::new(db2.clone()).with_id(id.clone()).build().unwrap();
+    let mut st1 = SecureTrieBuilder::new(db1.clone())
+                                        .with_id(id.clone())
+                                        .build_with_difflayer(None)
+                                        .unwrap();
+    let mut st2 = SecureTrieBuilder::new(db2.clone())
+                                        .with_id(id.clone())   
+                                        .build_with_difflayer(None)
+                                        .unwrap();
 
     // Insert 100_000 identical key-value pairs
     for i in 0u32..100_000 {
@@ -2019,4 +2025,112 @@ fn test_committer_parallel_equivalence() {
             guard.leaf_count(),
             guard.signature());
     }
+}
+
+/// Test U256 storage operations with hash state
+#[test]
+fn test_u256_storage_with_hash_state() {
+    println!("\n=== Starting U256 Storage Test ===");
+    
+    // Create temporary directory path
+    let temp_dir = env::temp_dir().join("trie_test_u256_storage");
+    let db_path = temp_dir.to_str().unwrap();
+
+    // Create PathDB database
+    let config = PathProviderConfig::default();
+    let db = PathDB::new(db_path, config)
+        .expect("Failed to create PathDB");
+
+    // Create SecureTrieId
+    let id = SecureTrieId::new(B256::ZERO);
+
+    // Create Trie instance
+    let mut state_trie = SecureTrieBuilder::new(db.clone())
+        .with_id(id.clone())
+        .build_with_difflayer(None)
+        .expect("Failed to create trie");
+
+    // Create a test storage key and hash it
+    let test_key = b"test_storage_key";
+    let hashed_key = keccak256(test_key);
+    
+    // Create a test U256 value
+    let test_value = alloy_primitives::U256::from(12345);
+    
+    println!("Test key: {:?}", test_key);
+    println!("Hashed key: {:?}", hashed_key);
+    println!("Test value: {:?}", test_value);
+    
+    // Update storage with U256 value
+    state_trie.update_storage_u256_with_hash_state(B256::ZERO, hashed_key, test_value)
+        .expect("Failed to update U256 storage");
+    
+    // Retrieve the storage value using U256 method
+    let retrieved_value = state_trie.get_storage_u256_with_hash_state(B256::ZERO, hashed_key)
+        .expect("Failed to get U256 storage");
+    
+    println!("Retrieved value: {:?}", retrieved_value);
+    
+    // Assert that the values are the same
+    if let Some(retrieved_u256) = retrieved_value {
+        assert_eq!(test_value, retrieved_u256, "Storage value mismatch: expected {:?}, got {:?}", test_value, retrieved_u256);
+        println!("✅ Storage value assertion passed!");
+    } else {
+        panic!("No storage value retrieved");
+    }
+    
+    // Test with a different value
+    let new_test_value = alloy_primitives::U256::from(98765);
+    println!("\nTesting with new value: {:?}", new_test_value);
+    
+    // Update storage with new value
+    state_trie.update_storage_u256_with_hash_state(B256::ZERO, hashed_key, new_test_value)
+        .expect("Failed to update U256 storage with new value");
+    
+    // Retrieve and verify the new value
+    let new_retrieved_value = state_trie.get_storage_u256_with_hash_state(B256::ZERO, hashed_key)
+        .expect("Failed to get updated U256 storage");
+    
+    if let Some(new_retrieved_u256) = new_retrieved_value {
+        assert_eq!(new_test_value, new_retrieved_u256, "Updated storage value mismatch: expected {:?}, got {:?}", new_test_value, new_retrieved_u256);
+        println!("✅ Updated storage value assertion passed!");
+    } else {
+        panic!("No updated storage value retrieved");
+    }
+    
+    // Test with zero value
+    let zero_value = alloy_primitives::U256::ZERO;
+    println!("\nTesting with zero value: {:?}", zero_value);
+    
+    state_trie.update_storage_u256_with_hash_state(B256::ZERO, hashed_key, zero_value)
+        .expect("Failed to update U256 storage with zero value");
+    
+    let zero_retrieved_value = state_trie.get_storage_u256_with_hash_state(B256::ZERO, hashed_key)
+        .expect("Failed to get zero U256 storage");
+    
+    if let Some(zero_retrieved_u256) = zero_retrieved_value {
+        assert_eq!(zero_value, zero_retrieved_u256, "Zero storage value mismatch: expected {:?}, got {:?}", zero_value, zero_retrieved_u256);
+        println!("✅ Zero storage value assertion passed!");
+    } else {
+        panic!("No zero storage value retrieved");
+    }
+    
+    // Test with a large U256 value
+    let large_value = alloy_primitives::U256::MAX;
+    println!("\nTesting with large value: {:?}", large_value);
+    
+    state_trie.update_storage_u256_with_hash_state(B256::ZERO, hashed_key, large_value)
+        .expect("Failed to update U256 storage with large value");
+    
+    let large_retrieved_value = state_trie.get_storage_u256_with_hash_state(B256::ZERO, hashed_key)
+        .expect("Failed to get large U256 storage");
+    
+    if let Some(large_retrieved_u256) = large_retrieved_value {
+        assert_eq!(large_value, large_retrieved_u256, "Large storage value mismatch: expected {:?}, got {:?}", large_value, large_retrieved_u256);
+        println!("✅ Large storage value assertion passed!");
+    } else {
+        panic!("No large storage value retrieved");
+    }
+    
+    println!("=== U256 Storage Test Completed Successfully ===");
 }

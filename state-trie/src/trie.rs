@@ -1,13 +1,12 @@
 //! Core trie implementation for secure trie operations.
 
 use std::sync::{Arc, Mutex};
+use tracing::warn;
 
 use alloy_primitives::{B256};
 use alloy_trie::EMPTY_ROOT_HASH;
 use rust_eth_triedb_common::TrieDatabase;
-
 use crate::trie_committer::Committer;
-
 use super::encoding::{common_prefix_length, key_to_nibbles, account_trie_node_key, storage_trie_node_key};
 use super::node::{Node, NodeFlag, FullNode, ShortNode, NodeSet, TrieNode, DiffLayer};
 use super::secure_trie::{SecureTrieId, SecureTrieError};
@@ -34,7 +33,7 @@ where
     DB::Error: std::fmt::Debug,
 {
     /// Creates a new trie with the given identifier and database
-    pub fn new(id: &SecureTrieId, database: DB, difflayer: Option<Arc<DiffLayer>>) -> Result<Self, SecureTrieError> {
+    pub fn new(id: &SecureTrieId, database: DB, difflayer: Option<&Arc<DiffLayer>>) -> Result<Self, SecureTrieError> {
         let mut tr = Self {
             root: Arc::new(Node::EmptyRoot),
             owner: id.owner,
@@ -43,7 +42,7 @@ where
             uncommitted: 0,
             tracer: TrieTracer::new(),
             database,
-            difflayer: difflayer,
+            difflayer: difflayer.map(|d| d.clone()),
         };
 
         // Check if this is an empty trie (root is EmptyRootHash)
@@ -58,12 +57,6 @@ where
         tr.root = root;
 
         Ok(tr)
-    }
-
-    /// Sets the difflayer for the trie
-    pub fn with_difflayer(&mut self, difflayer: Option<Arc<DiffLayer>>) -> Result<(), SecureTrieError> {
-        self.difflayer = difflayer;
-        Ok(())
     }
 
     /// Creates a new flag for the trie
@@ -734,13 +727,12 @@ where
         
         // 1. Check if the hash is in the difflayer
         if let Some(difflayer) = &self.difflayer {
-            if difflayer.contains_key(&key) {
-                let node = difflayer.get(&key).unwrap();
-                if node.hash == Some(*hash) {
-                    self.tracer.on_read(prefix, node.blob.clone().unwrap());
-                    return Ok(Node::must_decode_node(Some(*hash), &node.blob.clone().unwrap()));
-                }
+            if let Some(node) = difflayer.get(&key) {
+                self.tracer.on_read(prefix, node.blob.clone().unwrap());
+                return Ok(Node::must_decode_node(Some(*hash), &node.blob.clone().unwrap()));
             }
+        } else {
+            warn!("No difflayer found for trie: {:?}", self.owner);
         }
 
         // 2. Check if the hash is in the database
@@ -750,7 +742,7 @@ where
             return Ok(node);
         }
 
-        return Err(SecureTrieError::Database(format!("Node not found in database: owner: {:?}, prefix: {:?}", self.owner, prefix)));
+        return Err(SecureTrieError::Database(format!("Node not found in database: owner: {:?}, prefix: {:?}, key: {:?}", self.owner, prefix, key)));
     }
 
 }

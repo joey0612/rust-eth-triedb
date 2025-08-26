@@ -62,7 +62,7 @@ impl SmokeTest {
         // Initialize Reth StateTrie
         let path_db = PathDB::new(db_path, PathProviderConfig::default())?;
         let id = SecureTrieId::default();
-        let reth_trie = StateTrie::new(id, path_db)?;
+        let reth_trie = StateTrie::new(id, path_db, None)?;
         info!("Reth StateTrie initialized successfully");
 
         Ok(Self {
@@ -171,11 +171,12 @@ impl SmokeTest {
             let (address, account) = generate_random_address_and_account(&mut rng);
             self.accounts.insert(address, account.clone());
 
+            let val = generate_random_bytes_1_to_32_owned(&mut rng);
             // Update BSC trie
             if let Err(e) = self.bsc_trie.update_storage(
                 address,
                 address.as_slice(),
-                &address[..1],
+                &val,
             ) {
                 result.errors.push(format!("BSC update_storage failed: {}", e));
                 result.success = false;
@@ -185,7 +186,7 @@ impl SmokeTest {
             if let Err(e) = self.reth_trie.update_storage(
                 address,
                 address.as_slice(),
-                &address[..1],
+                &val,
             ) {
                 result.errors.push(format!("Reth update_storage failed: {}", e));
                 result.success = false;
@@ -273,5 +274,19 @@ fn generate_random_address_and_account(rng: &mut impl Rng) -> (Address, StateAcc
     };
 
     (address, account)
+}
+
+#[allow(dead_code)]
+fn generate_random_bytes_1_to_32_owned(rng: &mut impl Rng) -> Vec<u8> {
+    // Generate random length between 1 and 32
+    let length: usize = rng.gen_range(1..=32);
+    
+    // Create a vector with random bytes
+    let mut bytes = vec![0u8; length];
+    for byte in &mut bytes {
+        *byte = rng.gen::<u8>();
+    }
+    
+    bytes
 }
 

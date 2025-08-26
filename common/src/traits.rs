@@ -2,11 +2,35 @@
 
 use auto_impl::auto_impl;
 
+/// Batch operation trait for efficient database writes
+pub trait TrieDatabaseBatch {
+    /// Associated error type for batch operations
+    type Error;
+
+    /// Insert a key-value pair into the batch
+    fn insert(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Self::Error>;
+
+    /// Delete a key from the batch
+    fn delete(&mut self, key: &[u8]) -> Result<(), Self::Error>;
+
+    /// Check if the batch is empty
+    fn is_empty(&self) -> bool;
+
+    /// Get the number of operations in the batch
+    fn len(&self) -> usize;
+
+    /// Clear all operations from the batch
+    fn clear(&mut self) -> Result<(), Self::Error>;
+}
+
 /// Simple database trait for trie operations
 #[auto_impl(Box, Arc, Clone, Send + Sync + Debug + Unpin + 'static)]
 pub trait TrieDatabase {
     /// Associated error type for database operations
     type Error;
+
+    /// Associated batch type for batch operations
+    type Batch: TrieDatabaseBatch<Error = Self::Error>;
 
     /// Get a node from the database by its hash
     fn get(&self, path: &[u8]) -> Result<Option<Vec<u8>>, Self::Error>;
@@ -19,4 +43,10 @@ pub trait TrieDatabase {
 
     /// Remove a node from the database and return its data if found
     fn remove(&self, path: &[u8]);
+
+    /// Create a new batch for batch operations
+    fn create_batch(&self) -> Result<Self::Batch, Self::Error>;
+
+    /// Commit a batch of operations atomically
+    fn batch_commit(&self, batch: Self::Batch) -> Result<(), Self::Error>;
 }

@@ -6,3 +6,4 @@
 /// Database traits for trie operations.
 mod traits;
 pub use traits::TrieDatabase;
+pub use traits::TrieDatabaseBatch;
