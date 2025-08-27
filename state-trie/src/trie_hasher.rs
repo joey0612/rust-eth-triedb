@@ -181,7 +181,7 @@ mod tests {
 
         let mut state_trie = SecureTrieBuilder::new(db.clone())
             .with_id(id.clone())
-            .build()
+            .build_with_difflayer(None)
             .expect("Failed to create trie");
 
         let trie = state_trie.trie_mut();
@@ -400,7 +400,7 @@ mod tests {
 
         let mut state_trie = SecureTrieBuilder::new(db.clone())
             .with_id(id.clone())
-            .build()
+            .build_with_difflayer(None)
             .expect("Failed to create trie");
 
         let trie = state_trie.trie_mut();

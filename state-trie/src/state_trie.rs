@@ -1,6 +1,6 @@
 // ! State trie implementation for secure trie operations.
 
-use alloy_primitives::{Address, B256, keccak256};
+use alloy_primitives::{Address, B256, U256, keccak256};
 use std::{sync::Arc};
 
 use alloy_rlp::{Encodable, Decodable};
@@ -38,8 +38,8 @@ where
     DB::Error: std::fmt::Debug,
 {
     /// Creates a new state trie with the given identifier and database
-    pub fn new(id: SecureTrieId, database: DB) -> Result<Self, SecureTrieError> {
-        let trie = Trie::new(&id, database, None)?;
+    pub fn new(id: SecureTrieId, database: DB, difflayer: Option<&Arc<DiffLayer>>) -> Result<Self, SecureTrieError> {
+        let trie = Trie::new(&id, database, difflayer)?;
         Ok(Self { trie, id })
     }
 
@@ -81,11 +81,6 @@ where
 
     fn id(&self) -> &SecureTrieId {
         &self.id
-    }
-
-    fn with_difflayer(&mut self, difflayer: Option<Arc<DiffLayer>>) -> Result<(), Self::Error> {
-        self.trie.with_difflayer(difflayer)?;
-        Ok(())
     }
 
     fn get_account(&mut self, address: Address) -> Result<Option<StateAccount>, Self::Error> {
@@ -187,6 +182,29 @@ where
         let encoded_value = alloy_rlp::encode(value);
         self.trie.update(hashed_key.as_slice(), &encoded_value)?;
         Ok(())
+    }
+
+    fn update_storage_u256_with_hash_state(&mut self, _: B256, hashed_key: B256, value: U256) -> Result<(), Self::Error> {
+        let encoded_value = alloy_rlp::encode(&value);
+        self.trie.update(hashed_key.as_slice(), &encoded_value)?;
+        Ok(())
+    }
+
+    fn get_storage_u256_with_hash_state(&mut self, _: B256, hashed_key: B256) -> Result<Option<U256>, Self::Error> {
+        let enc = self.trie.get(hashed_key.as_slice())?;
+
+        if enc.is_none() {
+            return Ok(None);
+        }
+
+        let enc = enc.unwrap();
+        if enc.is_empty() {
+            return Ok(None);
+        }
+
+        // Decode the U256 value from RLP
+        let value_dec = U256::decode(&mut &enc[..]).map_err(|_| SecureTrieError::InvalidStorage)?;
+        Ok(Some(value_dec))
     }
     
     fn delete_storage_with_hash_state(&mut self, _: B256, hashed_key: B256) -> Result<(), Self::Error> {

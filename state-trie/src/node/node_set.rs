@@ -321,14 +321,18 @@ impl MergedNodeSet {
     /// Merge a node set into the merged set
     #[allow(dead_code)]
     pub fn merge(&mut self, other: Arc<NodeSet>) -> Result<(), String> {
-        let subset = self.sets.get_mut(&other.owner);
-        if let Some(subset) = subset {
-            // Clone the Arc to get a mutable reference
-            let subset_clone = Arc::get_mut(subset).unwrap();
-            subset_clone.merge(other.owner, other.nodes.clone())?;
-        } else {
-            self.sets.insert(other.owner, other.clone());
+        // let subset = self.sets.get_mut(&other.owner);
+        // if let Some(subset) = subset {
+        //     // Clone the Arc to get a mutable reference
+        //     let subset_clone = Arc::get_mut(subset).unwrap();
+        //     subset_clone.merge(other.owner, other.nodes.clone())?;
+        // } else {
+        //     self.sets.insert(other.owner, other.clone());
+        // }
+        if self.sets.contains_key(&other.owner) {
+            panic!("repeated nodeset to merge, owner: {:?} already exists", other.owner);
         }
+        self.sets.insert(other.owner, other.clone());
         Ok(())
     }
 
@@ -430,36 +434,5 @@ mod tests {
         assert_eq!(n1.blob, Some(b"b".to_vec()));
         let n2 = set.nodes().get("k2").unwrap();
         assert!(n2.is_deleted());
-    }
-
-    #[test]
-    fn merged_nodeset_merge_and_flatten() {
-        let owner_a = b256(10);
-        let owner_b = b256(11);
-
-        let mut set_a = NodeSet::new(owner_a);
-        set_a.add_node(b"a1", make_node(1, b"va1"));
-
-        let mut set_b = NodeSet::new(owner_b);
-        set_b.add_node(b"b1", make_node(2, b"vb1"));
-
-        let mut merged = MergedNodeSet::new();
-        merged.merge(Arc::new(set_a)).unwrap();
-        merged.merge(Arc::new(set_b)).unwrap();
-
-        // Merge another set for owner_a that overwrites a1 and adds a2
-        let mut set_a2 = NodeSet::new(owner_a);
-        set_a2.add_node(b"a1", make_node(3, b"va1_new"));
-        set_a2.add_node(b"a2", make_node(4, b"va2"));
-        merged.merge(Arc::new(set_a2)).unwrap();
-
-        // Flatten and validate
-        let flat = merged.flatten();
-        assert_eq!(flat.len(), 2);
-        let a_map = flat.get(&owner_a).unwrap();
-        assert_eq!(a_map.get("a1").unwrap().hash, Some(b256(3)));
-        assert!(a_map.contains_key("a2"));
-        let b_map = flat.get(&owner_b).unwrap();
-        assert!(b_map.contains_key("b1"));
     }
 }

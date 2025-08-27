@@ -2,9 +2,9 @@
 
 use std::{sync::Arc};
 
-use alloy_primitives::{Address, B256};
+use alloy_primitives::{Address, B256, U256};
 use super::account::StateAccount;
-use super::node::{NodeSet, DiffLayer};
+use super::node::{NodeSet};
 
 /// Error type for secure trie operations
 pub type SecureTrieError = super::secure_trie::SecureTrieError;
@@ -16,9 +16,6 @@ pub trait SecureTrieTrait {
 
     /// Returns the trie identifier
     fn id(&self) -> &super::secure_trie::SecureTrieId;
-
-    /// Sets the difflayer for the trie
-    fn with_difflayer(&mut self, difflayer: Option<Arc<DiffLayer>>) -> Result<(), Self::Error>;
 
     /// Gets an account from the trie by address
     fn get_account(&mut self, address: Address) -> Result<Option<StateAccount>, Self::Error>;
@@ -55,6 +52,12 @@ pub trait SecureTrieTrait {
 
     /// Deletes storage value for an account by key and hash state
     fn delete_storage_with_hash_state(&mut self, hashed_address: B256, hashed_key: B256) -> Result<(), Self::Error>;
+
+    /// Updates storage value for an account by key and hash state
+    fn update_storage_u256_with_hash_state(&mut self, hashed_address: B256, hashed_key: B256, value: U256) -> Result<(), Self::Error>;
+
+    /// Gets storage value for an account by key and hash state
+    fn get_storage_u256_with_hash_state(&mut self, hashed_address: B256, hashed_key: B256) -> Result<Option<U256>, Self::Error>;
 
     /// Returns the current root hash of the trie
     fn hash(&mut self) -> B256;

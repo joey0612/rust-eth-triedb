@@ -161,6 +161,8 @@ fn decode_nibbles(nibbles: &[u8], buf: &mut [u8]) {
 // Trie node storage prefixes
 pub const TRIE_NODE_STORAGE_PREFIX: &[u8] = b"O";
 pub const TRIE_NODE_ACCOUNT_PREFIX: &[u8] = b"A";
+pub const TRIE_STATE_ROOT_KEY: &[u8] = b"state_root";
+pub const TRIE_STATE_BLOCK_NUMBER_KEY: &[u8] = b"block_number";
 
 /// Generate storage trie node key: TrieNodeStoragePrefix + accountHash + path
 /// Equivalent to BSC's storageTrieNodeKey function
