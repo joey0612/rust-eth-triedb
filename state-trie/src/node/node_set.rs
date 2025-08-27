@@ -61,9 +61,9 @@ pub struct NodeSet {
     /// Owner hash (zero for account trie, account address hash for storage tries)
     pub owner: B256,
     /// Leaf nodes
-    leaves: Vec<Leaf>,
+    leaves: Vec<Arc<Leaf>>,
     /// Node map keyed by path
-    pub nodes: HashMap<String, TrieNode>,
+    pub nodes: HashMap<String, Arc<TrieNode>>,
     /// Count of updated and inserted nodes
     pub updates: usize,
     /// Count of deleted nodes
@@ -94,7 +94,7 @@ impl NodeSet {
     }
 
     /// Adds a node to the set
-    pub fn add_node(&mut self, path: &[u8], node: TrieNode) {
+    pub fn add_node(&mut self, path: &[u8], node: Arc<TrieNode>) {
         let path_str = String::from_utf8_lossy(path).to_string();
 
         // Add the new node
@@ -109,7 +109,7 @@ impl NodeSet {
 
     /// Adds a leaf node to the set
     pub fn add_leaf(&mut self, parent: B256, blob: Vec<u8>) {
-        self.leaves.push(Leaf { blob, parent });
+        self.leaves.push(Arc::new(Leaf { blob, parent }));
     }
 
     /// Returns the number of dirty nodes in the set
@@ -123,12 +123,12 @@ impl NodeSet {
     }
 
     /// Returns a reference to the nodes map
-    pub fn nodes(&self) -> &HashMap<String, TrieNode> {
+    pub fn nodes(&self) -> &HashMap<String, Arc<TrieNode>> {
         &self.nodes
     }
 
     /// Returns a mutable reference to the nodes map
-    pub fn nodes_mut(&mut self) -> &mut HashMap<String, TrieNode> {
+    pub fn nodes_mut(&mut self) -> &mut HashMap<String, Arc<TrieNode>> {
         &mut self.nodes
     }
 
@@ -160,31 +160,31 @@ impl NodeSet {
     }
 
     /// Merges another node set into this one
-    pub fn merge(&mut self, owner: B256, nodes: HashMap<String, TrieNode>) -> Result<(), String> {
-        if self.owner != owner {
-            return Err(format!(
-                "nodesets belong to different owner are not mergeable {:?}-{:?}",
-                self.owner, owner
-            ));
-        }
+    // pub fn merge(&mut self, owner: B256, nodes: HashMap<String, TrieNode>) -> Result<(), String> {
+    //     if self.owner != owner {
+    //         return Err(format!(
+    //             "nodesets belong to different owner are not mergeable {:?}-{:?}",
+    //             self.owner, owner
+    //         ));
+    //     }
 
-        for (path, node) in &nodes {
-            if let Some(prev_node) = self.nodes.get(path) {
-                if prev_node.is_deleted() {
-                    self.deletes -= 1;
-                } else {
-                    self.updates -= 1;
-                }
-            }
-            if node.is_deleted() {
-                self.deletes += 1;
-            } else {
-                self.updates += 1;
-            }
-            self.nodes.insert(path.clone(), node.clone());
-        }
-        return Ok(());
-    }
+    //     for (path, node) in &nodes {
+    //         if let Some(prev_node) = self.nodes.get(path) {
+    //             if prev_node.is_deleted() {
+    //                 self.deletes -= 1;
+    //             } else {
+    //                 self.updates -= 1;
+    //             }
+    //         }
+    //         if node.is_deleted() {
+    //             self.deletes += 1;
+    //         } else {
+    //             self.updates += 1;
+    //         }
+    //         self.nodes.insert(path.clone(), node.clone());
+    //     }
+    //     return Ok(());
+    // }
 
     /// Returns true if the node set is empty
     pub fn is_empty(&self) -> bool {
@@ -227,7 +227,7 @@ impl NodeSet {
         }
 
         // 3. nodes (sorted by key)
-        let mut nodes_sorted: Vec<(&String, &TrieNode)> = self.nodes.iter().collect();
+        let mut nodes_sorted: Vec<(&String, &Arc<TrieNode>)> = self.nodes.iter().collect();
         nodes_sorted.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
 
         for (key, node) in nodes_sorted {
@@ -302,7 +302,7 @@ impl std::fmt::Debug for NodeSet {
 }
 
 /// Alias for difflayer node mapping
-pub type DiffLayer = HashMap<Vec<u8>, TrieNode>;
+pub type DiffLayer = HashMap<Vec<u8>, Arc<TrieNode>>;
 
 /// MergedNodeSet is a set of node sets that are merged together.
 #[derive(Debug, Clone)]
@@ -337,15 +337,15 @@ impl MergedNodeSet {
     }
 
     /// Flatten the merged set into a single map of nodes
-    #[allow(dead_code)]
-    pub fn flatten(&self) -> HashMap<B256, HashMap<String, TrieNode>> {
-        let mut nodes: HashMap<B256, HashMap<String, TrieNode>> =
-            HashMap::with_capacity(self.sets.len());
-        for (owner, set) in &self.sets {
-            nodes.insert(*owner, set.nodes.clone());
-        }
-        nodes
-    }
+    // #[allow(dead_code)]
+    // pub fn flatten(&self) -> HashMap<B256, HashMap<String, TrieNode>> {
+    //     let mut nodes: HashMap<B256, HashMap<String, TrieNode>> =
+    //         HashMap::with_capacity(self.sets.len());
+    //     for (owner, set) in &self.sets {
+    //         nodes.insert(*owner, set.nodes.clone());
+    //     }
+    //     nodes
+    // }
 
     /// Convert the merged node set to a difflayer
     pub fn to_difflayer(&self) -> Arc<DiffLayer> {
@@ -373,8 +373,8 @@ mod tests {
         B256::from([byte; 32])
     }
 
-    fn make_node(hash_byte: u8, blob_bytes: &[u8]) -> TrieNode {
-        TrieNode::new(Some(b256(hash_byte)), Some(blob_bytes.to_vec()))
+    fn make_node(hash_byte: u8, blob_bytes: &[u8]) -> Arc<TrieNode> {
+        Arc::new(TrieNode::new(Some(b256(hash_byte)), Some(blob_bytes.to_vec())))
     }
 
     #[test]
@@ -383,7 +383,7 @@ mod tests {
         assert_eq!(set.size(), (0, 0));
 
         set.add_node(b"abc", make_node(1, b"v1"));
-        set.add_node(b"def", TrieNode { hash: Some(B256::ZERO), blob: Some(Vec::new()) }); // deleted
+        set.add_node(b"def", Arc::new(TrieNode { hash: Some(B256::ZERO), blob: Some(Vec::new()) })); // deleted
         assert_eq!(set.size(), (1, 1));
         assert_eq!(set.nodes().len(), 2);
     }
@@ -404,35 +404,5 @@ mod tests {
             "abc".to_string(),
             "abb".to_string(),
         ]);
-    }
-
-    #[test]
-    fn nodeset_merge_owner_mismatch_returns_err() {
-        let mut set = NodeSet::new(b256(1));
-        let err = set.merge(b256(2), HashMap::new()).err();
-        assert!(err.is_some());
-    }
-
-    #[test]
-    fn nodeset_merge_updates_counters_and_values() {
-        let owner = b256(1);
-        let mut set = NodeSet::new(owner);
-        // initial value for k1
-        set.add_node(b"k1", make_node(1, b"a"));
-        assert_eq!(set.size(), (1, 0));
-
-        let mut incoming: HashMap<String, TrieNode> = HashMap::new();
-        incoming.insert("k1".to_string(), make_node(2, b"b")); // overwrite update
-        incoming.insert("k2".to_string(), TrieNode { hash: Some(B256::ZERO), blob: Some(Vec::new()) }); // delete
-
-        set.merge(owner, incoming).unwrap();
-
-        // Overwrite cancels previous update ( -1 + 1 ), plus one delete
-        assert_eq!(set.size(), (1, 1));
-        let n1 = set.nodes().get("k1").unwrap();
-        assert_eq!(n1.hash, Some(b256(2)));
-        assert_eq!(n1.blob, Some(b"b".to_vec()));
-        let n2 = set.nodes().get("k2").unwrap();
-        assert!(n2.is_deleted());
     }
 }
