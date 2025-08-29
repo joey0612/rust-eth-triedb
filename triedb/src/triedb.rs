@@ -3,6 +3,7 @@
 use std::sync::{Arc};
 use std::collections::{HashMap, HashSet};
 use rayon::prelude::*;
+use std::time::Instant;
 
 use alloy_primitives::{keccak256, Address, B256, U256};
 use alloy_trie::{EMPTY_ROOT_HASH};
@@ -13,6 +14,37 @@ use rust_eth_triedb_state_trie::state_trie::StateTrie;
 use rust_eth_triedb_state_trie::account::StateAccount;
 use rust_eth_triedb_state_trie::{SecureTrieId, SecureTrieTrait, SecureTrieBuilder};
 use rust_eth_triedb_state_trie::encoding::{TRIE_STATE_ROOT_KEY, TRIE_STATE_BLOCK_NUMBER_KEY};
+
+use reth_metrics::{
+    metrics::{Histogram},
+    Metrics,
+};
+
+/// Metrics for the `TrieDB`.
+#[derive(Metrics, Clone)]
+#[metrics(scope = "rust.eth.triedb")]
+pub(crate) struct TrieDBMetrics {
+    /// Histogram of hash durations (in seconds)
+    pub(crate) hash_duration: Histogram,
+    /// Histogram of commit durations (in seconds)
+    pub(crate) commit_duration: Histogram,
+    /// Histogram of flush durations (in seconds)
+    pub(crate) flush_duration: Histogram,
+}
+
+impl TrieDBMetrics {
+    pub(crate) fn record_hash_duration(&self, duration: f64) {
+        self.hash_duration.record(duration);
+    }
+
+    pub(crate) fn record_commit_duration(&self, duration: f64) {
+        self.commit_duration.record(duration);
+    }
+
+    pub(crate) fn record_flush_duration(&self, duration: f64) {
+        self.flush_duration.record(duration);
+    }
+}
 
 /// Error type for trie database operations
 #[derive(Debug, thiserror::Error)]
@@ -43,6 +75,7 @@ where
     accounts_with_storage_trie: HashMap<B256, StateAccount>,
     difflayer: Option<Arc<DiffLayer>>,
     db: DB,
+    metrics: TrieDBMetrics,
 }
 
 /// External Initializer and getters 
@@ -67,6 +100,7 @@ where
             accounts_with_storage_trie: HashMap::new(),
             difflayer: None,
             db: db.clone(),
+            metrics: TrieDBMetrics::new_with_labels(&[("instance", "default")]),
         }
     }
 
@@ -171,6 +205,8 @@ where
     }
 
     pub fn calculate_hash(&mut self) -> Result<B256, TrieDBError> {
+        let hash_start = Instant::now();
+
         let storage_hashes: HashMap<B256, B256> = self.storage_tries
         .par_iter()
         .map(|(key, trie)| (*key, trie.clone().hash()))
@@ -182,12 +218,14 @@ where
             self.update_account_with_hash_state(hashed_address, &account)?;
         }
 
+        self.metrics.record_hash_duration(hash_start.elapsed().as_secs_f64());
         Ok(self.account_trie.hash())
     }
 
     pub fn commit(&mut self, _collect_leaf: bool) -> Result<(B256, Arc<MergedNodeSet>), TrieDBError> {
         let root_hash = self.calculate_hash()?;
 
+        let commit_start = Instant::now();
         let mut merged_node_set = MergedNodeSet::new();
 
         // Start both tasks in parallel using rayon
@@ -217,6 +255,7 @@ where
             }
         }
 
+        self.metrics.record_commit_duration(commit_start.elapsed().as_secs_f64());
         Ok((root_hash, Arc::new(merged_node_set))) 
     }
 }
@@ -459,6 +498,8 @@ where
     DB::Error: std::fmt::Debug,
 {
     pub fn flush(&mut self, block_number: u64, state_root: B256, update_nodes: Option<Arc<DiffLayer>>) -> Result<(), TrieDBError> {
+        let flush_start = Instant::now();
+
         if let Some(difflayer) = update_nodes {
             for (key, node) in difflayer.as_ref() {
                 if node.is_deleted() {
@@ -473,6 +514,8 @@ where
             .map_err(|e| TrieDBError::Database(format!("Failed to insert state root: {:?}", e)))?;
         self.db.insert(TRIE_STATE_BLOCK_NUMBER_KEY, block_number.to_le_bytes().to_vec())
             .map_err(|e| TrieDBError::Database(format!("Failed to insert block number: {:?}", e)))?;
+        
+        self.metrics.record_flush_duration(flush_start.elapsed().as_secs_f64());
         Ok(())
     }
 }

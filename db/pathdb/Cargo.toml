@@ -34,6 +34,12 @@ schnellru.workspace = true
 # Testing
 tempfile.workspace = true
 
+# reth
+reth-metrics = { workspace = true, features = ["common"] }
+
+# metrics (required by reth-metrics derive macro)
+metrics.workspace = true
+
 # Jemalloc support
 tikv-jemallocator = { workspace = true, optional = true }
 

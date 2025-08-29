@@ -43,6 +43,11 @@ rust-eth-triedb-state-trie = { version = "0.1.0", path = "state-trie" }
 
 # reth
 reth-trie-common = { version = "1.6.0", path = "../reth/crates/trie/common" }
+reth-metrics = { version = "1.6.0", path = "../reth/crates/metrics"}
+
+# metrics (required by reth-metrics)
+metrics = "0.24.0"
+metrics-derive = "0.1"
 
 [workspace.features]
 jemalloc = ["tikv-jemallocator"]
