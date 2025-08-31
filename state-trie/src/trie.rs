@@ -1,7 +1,6 @@
 //! Core trie implementation for secure trie operations.
 
 use std::sync::{Arc, Mutex};
-use tracing::warn;
 
 use alloy_primitives::{B256};
 use alloy_trie::EMPTY_ROOT_HASH;
@@ -731,8 +730,6 @@ where
                 self.tracer.on_read(prefix, node.blob.clone().unwrap());
                 return Ok(Node::must_decode_node(Some(*hash), &node.blob.clone().unwrap()));
             }
-        } else {
-            warn!("No difflayer found for trie: {:?}", self.owner);
         }
 
         // 2. Check if the hash is in the database
