@@ -12,6 +12,21 @@ use tracing::{error, trace};
 use crate::traits::*;
 use rust_eth_triedb_common::{TrieDatabase,TrieDatabaseBatch};
 
+use reth_metrics::{
+    metrics::{Counter},
+    Metrics,
+};
+
+/// Metrics for the `TrieDB`.
+#[derive(Metrics, Clone)]
+#[metrics(scope = "rust.eth.triedb.pathdb")]
+pub(crate) struct PathDBMetrics {
+    /// Counter of cache hits
+    pub(crate) cache_hits: Counter,
+    /// Counter of cache misses
+    pub(crate) cache_misses: Counter,
+}
+
 /// PathDB implementation using RocksDB.
 pub struct PathDB {
     /// The underlying RocksDB instance.
@@ -24,6 +39,8 @@ pub struct PathDB {
     read_options: ReadOptions,
     /// LRU cache for key-value pairs.
     cache: Arc<Mutex<LruMap<Vec<u8>, Option<Vec<u8>>, ByLength>>>,
+    /// Metrics for the PathDB.
+    metrics: PathDBMetrics,
 }
 
 impl<'a> Debug for PathDB {
@@ -49,6 +66,7 @@ impl<'a> Clone for PathDB {
             write_options,
             read_options,
             cache: self.cache.clone(),
+            metrics: self.metrics.clone(),
         }
     }
 }
@@ -83,6 +101,7 @@ impl<'a> PathDB {
             write_options,
             read_options,
             cache: Arc::new(Mutex::new(LruMap::new(ByLength::new(cache_size)))),
+            metrics: PathDBMetrics::new_with_labels(&[("instance", "default")]),
         })
     }
 
@@ -107,6 +126,11 @@ impl<'a> PathDB {
         let cache = self.cache.lock().unwrap();
         (cache.len(), self.config.cache_size)
     }
+
+    /// Create a new metrics instance for the PathDB.
+    pub fn with_new_metrics(&mut self, instance_name: &str) {
+        self.metrics = PathDBMetrics::new_with_labels(&[("instance", instance_name.to_string())]);
+    }
 }
 
 impl PathProvider for PathDB {
@@ -117,8 +141,11 @@ impl PathProvider for PathDB {
         {
             let cache = self.cache.lock().unwrap();
             if let Some(cached_value) = cache.peek(key) {
+                self.metrics.cache_hits.increment(1);
                 trace!(target: "pathdb::rocksdb", "Found value in cache for key: {:?}", key);
                 return Ok(cached_value.clone());
+            } else {
+                self.metrics.cache_misses.increment(1);
             }
         }
 
@@ -189,7 +216,10 @@ impl PathProvider for PathDB {
             let cache = self.cache.lock().unwrap();
             if let Some(cached_value) = cache.peek(key) {
                 trace!(target: "pathdb::rocksdb", "Key exists in cache: {:?}", key);
+                self.metrics.cache_hits.increment(1);
                 return Ok(cached_value.is_some());
+            } else {
+                self.metrics.cache_misses.increment(1);
             }
         }
 

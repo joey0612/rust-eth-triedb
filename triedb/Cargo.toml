@@ -23,6 +23,10 @@ alloy-trie.workspace = true
 
 #reth
 reth-trie-common.workspace = true
+reth-metrics = { workspace = true, features = ["common"] }
+
+# metrics (required by reth-metrics derive macro)
+metrics.workspace = true
 
 # External dependencies
 alloy-primitives = { workspace = true, features = ["asm-keccak"] }
