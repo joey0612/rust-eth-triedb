@@ -48,3 +48,9 @@ jemalloc = ["tikv-jemallocator"]
 # misc
 pretty_assertions.workspace = true
 tempfile.workspace = true
+
+[profile.maxperf]
+inherits = "release"
+opt-level = 3
+lto = "thin"
+codegen-units = 1
