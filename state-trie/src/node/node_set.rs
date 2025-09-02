@@ -63,7 +63,7 @@ pub struct NodeSet {
     /// Leaf nodes
     leaves: Vec<Arc<Leaf>>,
     /// Node map keyed by path
-    pub nodes: HashMap<String, Arc<TrieNode>>,
+    pub nodes: HashMap<String, TrieNode>,
     /// Count of updated and inserted nodes
     pub updates: usize,
     /// Count of deleted nodes
@@ -94,7 +94,7 @@ impl NodeSet {
     }
 
     /// Adds a node to the set
-    pub fn add_node(&mut self, path: &[u8], node: Arc<TrieNode>) {
+    pub fn add_node(&mut self, path: &[u8], node: TrieNode) {
         let path_str = String::from_utf8_lossy(path).to_string();
 
         // Add the new node
@@ -123,12 +123,12 @@ impl NodeSet {
     }
 
     /// Returns a reference to the nodes map
-    pub fn nodes(&self) -> &HashMap<String, Arc<TrieNode>> {
+    pub fn nodes(&self) -> &HashMap<String, TrieNode> {
         &self.nodes
     }
 
     /// Returns a mutable reference to the nodes map
-    pub fn nodes_mut(&mut self) -> &mut HashMap<String, Arc<TrieNode>> {
+    pub fn nodes_mut(&mut self) -> &mut HashMap<String, TrieNode> {
         &mut self.nodes
     }
 
@@ -227,7 +227,7 @@ impl NodeSet {
         }
 
         // 3. nodes (sorted by key)
-        let mut nodes_sorted: Vec<(&String, &Arc<TrieNode>)> = self.nodes.iter().collect();
+        let mut nodes_sorted: Vec<(&String, &TrieNode)> = self.nodes.iter().collect();
         nodes_sorted.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
 
         for (key, node) in nodes_sorted {
@@ -302,7 +302,7 @@ impl std::fmt::Debug for NodeSet {
 }
 
 /// Alias for difflayer node mapping
-pub type DiffLayer = HashMap<Vec<u8>, Arc<TrieNode>>;
+pub type DiffLayer = HashMap<Vec<u8>, TrieNode>;
 
 /// MergedNodeSet is a set of node sets that are merged together.
 #[derive(Debug, Clone)]
@@ -373,8 +373,8 @@ mod tests {
         B256::from([byte; 32])
     }
 
-    fn make_node(hash_byte: u8, blob_bytes: &[u8]) -> Arc<TrieNode> {
-        Arc::new(TrieNode::new(Some(b256(hash_byte)), Some(blob_bytes.to_vec())))
+    fn make_node(hash_byte: u8, blob_bytes: &[u8]) -> TrieNode {
+       TrieNode::new(Some(b256(hash_byte)), Some(blob_bytes.to_vec()))
     }
 
     #[test]
@@ -383,7 +383,7 @@ mod tests {
         assert_eq!(set.size(), (0, 0));
 
         set.add_node(b"abc", make_node(1, b"v1"));
-        set.add_node(b"def", Arc::new(TrieNode { hash: Some(B256::ZERO), blob: Some(Vec::new()) })); // deleted
+        set.add_node(b"def", TrieNode { hash: Some(B256::ZERO), blob: Some(Vec::new()) }); // deleted
         assert_eq!(set.size(), (1, 1));
         assert_eq!(set.nodes().len(), 2);
     }
