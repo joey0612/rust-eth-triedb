@@ -51,7 +51,7 @@ metrics-derive = "0.1"
 
 [workspace.features]
 jemalloc = ["tikv-jemallocator"]
-
+jemalloc-prof = ["tikv-jemallocator?/profiling"] 
 
 [profile.release]
 opt-level = 3
@@ -60,6 +60,11 @@ debug = "none"
 strip = "symbols"
 panic = "unwind"
 codegen-units = 16
+
+[profile.release-with-debug]
+inherits = "release"
+debug = 2
+strip = "none"
 
 [profile.maxperf]
 inherits = "release"

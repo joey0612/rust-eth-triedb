@@ -11,6 +11,7 @@ description = "PathDB implementation for RocksDB integration"
 [features]
 default = []
 jemalloc = ["tikv-jemallocator"]
+jemalloc-prof = ["tikv-jemallocator?/profiling"]
 
 [dependencies]
 # reth
@@ -19,8 +20,8 @@ rust-eth-triedb-common.workspace = true
 # alloy
 alloy-primitives = { workspace = true, features = ["asm-keccak"] }
 
-# RocksDB
-rocksdb = { workspace = true, features = ["multi-threaded-cf", "io-uring", "lto", "jemalloc"] }
+# RocksDB, 
+rocksdb = { workspace = true, features = ["multi-threaded-cf", "io-uring", "jemalloc"] }
 
 # Error handling
 thiserror.workspace = true

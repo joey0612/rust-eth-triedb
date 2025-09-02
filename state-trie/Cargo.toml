@@ -39,6 +39,7 @@ tracing.workspace = true
 # serde = ["alloy-primitives/serde"]
 arbitrary = ["dep:arbitrary"]
 jemalloc = ["tikv-jemallocator"]
+jemalloc-prof = ["tikv-jemallocator?/profiling"]
 
 [dev-dependencies]
 # reth

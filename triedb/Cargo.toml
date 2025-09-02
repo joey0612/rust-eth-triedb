@@ -11,6 +11,7 @@ description = "Trie database implementation for Ethereum state management"
 [features]
 default = []
 jemalloc = ["tikv-jemallocator"]
+jemalloc-prof = ["tikv-jemallocator?/profiling"]
 
 [dependencies]
 # Local dependencies
