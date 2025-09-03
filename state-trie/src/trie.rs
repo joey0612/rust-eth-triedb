@@ -45,7 +45,7 @@ where
     /// Creates a new trie with the given identifier and database
     pub fn new(id: &SecureTrieId, database: DB, difflayer: Option<&Arc<DiffLayer>>) -> Result<Self, SecureTrieError> {
         let mut tr = Self {
-            root: Arc::new(Node::EmptyRoot),
+            root: Node::empty_root(),
             owner: id.owner,
             committed: false,
             unhashed: 0,
@@ -57,9 +57,11 @@ where
 
         // Check if this is an empty trie (root is EmptyRootHash)
         let root = if id.state_root == alloy_trie::EMPTY_ROOT_HASH {
-            Arc::new(Node::EmptyRoot)
+            let root =Node::empty_root();
+            root 
         } else if id.state_root == B256::ZERO {
-            Arc::new(Node::EmptyRoot)
+            let root =Node::empty_root();
+            root 
         } else {
             let root = tr.resolve_and_track(&id.state_root, &[])?;
             root
@@ -81,7 +83,7 @@ where
 
     /// Gets the root hash of the trie
     pub fn hash(&mut self) -> B256 {
-        if self.root == Arc::new(Node::EmptyRoot) {
+        if self.root == Node::empty_root() {
             return EMPTY_ROOT_HASH;
         }
         let hasher = Hasher::new(self.unhashed > 100);
@@ -95,7 +97,7 @@ where
     }
 
     pub fn commit(&mut self, collect_leaf: bool) -> Result<(B256, Option<Arc<NodeSet>>), SecureTrieError> {
-        if matches!(&*self.root, Node::EmptyRoot) {
+        if matches!(&*self.root, Node::Empty) {
             let paths = self.tracer.deleted_nodes();
             if paths.len() == 0 {
                 self.committed = true;
@@ -276,7 +278,7 @@ where
     ) -> Result<(Option<Vec<u8>>, Arc<Node>, bool), SecureTrieError> {
         match &*node {
             // Empty root - no value found
-            Node::EmptyRoot => {
+            Node::Empty => {
                 Ok((None, node, false))
             }
 
@@ -417,7 +419,7 @@ where
                 short_prefix.extend(&short.key[..matchlen + 1]);
 
                 let (_, new_child1) = self.insert_internal(
-                    Arc::new(Node::EmptyRoot),
+                    Node::empty_root(),
                     short_prefix,
                     short.key[matchlen + 1..].to_vec(),
                     Arc::clone(&short.val)
@@ -428,7 +430,7 @@ where
                 let mut new_prefix = prefix.clone();
                 new_prefix.extend(&nibbles_key[..matchlen + 1]);
                 let (_, new_child2) = self.insert_internal(
-                    Arc::new(Node::EmptyRoot),
+                    Node::empty_root(),
                     new_prefix,
                     nibbles_key[matchlen + 1..].to_vec(),
                     value
@@ -481,7 +483,7 @@ where
             }
 
             // Empty root - create new short node
-            Node::EmptyRoot => {
+            Node::Empty => {
 
                 // Trace the insert operation
                 self.tracer.on_insert(prefix.clone());
@@ -540,7 +542,7 @@ where
                 if matchlen == nibbles_key.len() {
                     // Trace the delete operation
                     self.tracer.on_delete(prefix.clone());
-                    return Ok((true, Arc::new(Node::EmptyRoot)));
+                    return Ok((true, Node::empty_root()));
                 }
 
                 // Partial match - continue deletion in child node
@@ -619,14 +621,14 @@ where
                 let full_copy = new_full.clone();
 
                 match &*new_child {
-                    Node::EmptyRoot => {
+                    Node::Empty => {
                         // Child became empty - check if we can collapse the FullNode
                         let mut non_empty_pos = -1i32;
                         let mut non_empty_count = 0;
 
                         // Count non-empty children and find their position
                         for (i, child) in full_copy.children.iter().enumerate() {
-                            if !matches!(&**child, Node::EmptyRoot) {
+                            if !matches!(&**child, Node::Empty) {
                                 non_empty_count += 1;
                                 if non_empty_pos == -1 {
                                     non_empty_pos = i as i32;
@@ -693,12 +695,12 @@ where
 
             // Handle ValueNode deletion - replace with EmptyRoot
             Node::Value(_) => {
-                Ok((true, Arc::new(Node::EmptyRoot)))
+                Ok((true, Node::empty_root()))
             }
 
             // Handle EmptyRoot - nothing to delete
-            Node::EmptyRoot => {
-                Ok((false, Arc::new(Node::EmptyRoot)))
+            Node::Empty => {
+                Ok((false, Node::empty_root()))
             }
 
             // Handle HashNode - resolve and recurse
@@ -789,7 +791,7 @@ where
         let connector = if is_last { "└── " } else { "├── " };
 
         match &**node {
-            Node::EmptyRoot => {
+            Node::Empty => {
                 println!("{}{}EmptyRoot", prefix, connector);
             }
             Node::Value(value) => {
@@ -811,14 +813,14 @@ where
                 // Print non-empty children
                 let mut non_empty_count = 0;
                 for (_i, child) in full.children.iter().enumerate() {
-                    if !matches!(&**child, Node::EmptyRoot) {
+                    if !matches!(&**child, Node::Empty) {
                         non_empty_count += 1;
                     }
                 }
 
                 let mut current_count = 0;
                 for (i, child) in full.children.iter().enumerate() {
-                    if !matches!(&**child, Node::EmptyRoot) {
+                    if !matches!(&**child, Node::Empty) {
                         current_count += 1;
                         let is_last_child = current_count == non_empty_count;
 

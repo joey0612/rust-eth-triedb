@@ -113,8 +113,8 @@ impl Hasher {
                 .into_par_iter()
                 .map(|i| {
                     match &*full.children[i] {
-                        Node::EmptyRoot => {
-                            (Arc::new(Node::EmptyRoot), Arc::new(Node::EmptyRoot))
+                        Node::Empty => {
+                            (Node::empty_root(), Node::empty_root())
                         }
                         _ => {
                             // Initialize a new hasher for each parallel task
@@ -134,7 +134,7 @@ impl Hasher {
         } else {
             for i in 0..16 {
                 match &*full.children[i] {
-                    Node::EmptyRoot => {
+                    Node::Empty => {
                         continue;
                     }
                     _ => {
@@ -332,7 +332,7 @@ mod tests {
         let serial_hasher = Hasher::new(false);
 
         // Test with empty node
-        let empty_node = Arc::new(Node::EmptyRoot);
+        let empty_node = Node::empty_root();
         let (parallel_empty, _) = parallel_hasher.hash(empty_node.clone(), false);
         let (serial_empty, _) = serial_hasher.hash(empty_node.clone(), false);
 

@@ -5,7 +5,7 @@
 
 #[allow(unused_imports)]
 use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable, Error as RlpError};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use alloy_primitives::B256;
 
 use super::{FullNode, ShortNode};
@@ -47,11 +47,14 @@ pub type HashNode = B256;
 /// in the trie, representing the end of a trie path.
 pub type ValueNode = Vec<u8>;
 
+static EMPTY_ROOT_NODE: OnceLock<Arc<Node>> = OnceLock::new();
+
+
 /// Node types in the BSC-style trie
 #[derive(Debug, Clone, PartialEq)]
 pub enum Node {
     /// Empty root node
-    EmptyRoot,
+    Empty,
     /// Full node with 17 children
     Full(Arc<FullNode>),
     /// Short node (extension or leaf)
@@ -62,13 +65,12 @@ pub enum Node {
     Value(ValueNode),
 }
 
-impl Default for Node {
-    fn default() -> Self {
-        Node::EmptyRoot
-    }
-}
-
 impl Node {
+    /// Get the empty root node
+    pub fn empty_root() -> Arc<Node> {
+        EMPTY_ROOT_NODE.get_or_init(|| Arc::new(Node::Empty)).clone()
+    }
+
     /// Get the cached hash and dirty state
     pub fn cache(&self) -> (Option<HashNode>, bool) {
         match self {
@@ -76,7 +78,7 @@ impl Node {
             Node::Short(short) => return short.cache(),
             Node::Hash(_) => return (None, false),
             Node::Value(_) => return (None, false),
-            Node::EmptyRoot => return (None, false),
+            Node::Empty => return (None, false),
         }
     }
 
@@ -87,7 +89,7 @@ impl Node {
             Node::Short(short) => short.to_rlp(),
             Node::Hash(_) => panic!("Hash node should not be encoded"),
             Node::Value(_) => panic!("Value node should not be encoded"),
-            Node::EmptyRoot => panic!("EmptyRoot should not be encoded"),
+            Node::Empty => panic!("EmptyRoot should not be encoded"),
         }
     }
 
@@ -140,7 +142,7 @@ impl Node {
             }
             // Empty reference
             Kind::String if val.is_empty() => {
-                Ok((Arc::new(Node::EmptyRoot), rest))
+                Ok((Node::empty_root(), rest))
             }
             // Hash reference
             Kind::String if val.len() == 32 => {
@@ -168,9 +170,7 @@ impl Drop for Node {
             Node::Value(_) => {
                 println!("    Node::Value dropped, node address: {:p}", std::ptr::addr_of!(*self));
             }
-            Node::EmptyRoot => {
-                println!("    Node::EmptyRoot dropped, node address: {:p}", std::ptr::addr_of!(*self));
-            }
+            _ => {}
         }
     }
 }
@@ -199,7 +199,7 @@ mod tests {
             Node::Full(full) => {
                 // Children 0..=15 should be EmptyRoot by default
                 for i in 0..16 {
-                    assert!(matches!(full.get_child(i).as_ref(), Node::EmptyRoot));
+                    assert!(matches!(full.get_child(i).as_ref(), Node::Empty));
                 }
                 // 17th child is value node and should match
                 match full.get_child(16).as_ref() {

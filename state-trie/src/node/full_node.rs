@@ -23,7 +23,7 @@ impl FullNode {
     /// Creates a new empty full node
     pub fn new() -> Self {
         Self {
-            children: std::array::from_fn(|_| Arc::new(Node::EmptyRoot)),
+            children: std::array::from_fn(|_| Node::empty_root()),
             flags: NodeFlag::default(),
         }
     }
@@ -99,7 +99,7 @@ impl Encodable for FullNode {
         // Encode all children nodes (0-16)
         for (_, child) in self.children.iter().enumerate() {
             match child.as_ref() {
-                Node::EmptyRoot => {
+                Node::Empty => {
                     // Empty root encoded as empty string [0x80]
                     write_bytes(&mut temp_buf, &Vec::new());
                 }

@@ -112,7 +112,7 @@ impl<'a> Committer<'a> {
         full: Arc<FullNode>,
         parallel: bool,
     ) -> [Arc<Node>; 17] {
-        let mut children: [Arc<Node>; 17] = std::array::from_fn(|_| Arc::new(Node::EmptyRoot));
+        let mut children: [Arc<Node>; 17] = std::array::from_fn(|_| Node::empty_root());
 
         if parallel {
             use rayon::prelude::*;
@@ -128,8 +128,8 @@ impl<'a> Committer<'a> {
                 .into_par_iter()
                 .filter_map(|i| {
                     let child = full.children[i].clone();
-                    if matches!(child.as_ref(), Node::EmptyRoot) {
-                        return Some((i, Arc::new(Node::EmptyRoot)));
+                    if matches!(child.as_ref(), Node::Empty) {
+                        return Some((i, Node::empty_root()));
                     }
 
                     // Local nodeset & committer for the child branch
@@ -164,7 +164,7 @@ impl<'a> Committer<'a> {
             }
         } else {
             for i in 0..16 {
-                if let Node::EmptyRoot = full.children[i].as_ref() {
+                if let Node::Empty = full.children[i].as_ref() {
                     continue;
                 }
 
