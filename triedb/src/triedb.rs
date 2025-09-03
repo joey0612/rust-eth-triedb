@@ -252,10 +252,20 @@ where
 
         let hash_start = Instant::now();
 
-        let storage_hashes: HashMap<B256, B256> = self.storage_tries
+        let (storage_hashes, storage_tries): (HashMap<B256, B256>, HashMap<B256, StateTrie<DB>>) = self.storage_tries
         .par_iter()
-        .map(|(key, trie)| (*key, trie.clone().hash()))
-        .collect();
+        .map(|(key, trie)| {
+            let mut trie_clone = trie.clone();
+            let hash = trie_clone.hash();
+            (*key, hash, trie_clone)
+        })
+        .collect::<Vec<_>>()
+        .into_iter()
+        .fold((HashMap::new(), HashMap::new()), |(mut hashes, mut tries), (key, hash, trie)| {
+            hashes.insert(key, hash);
+            tries.insert(key, trie);
+            (hashes, tries)
+        });
 
         println!("calculate_hash, 222222222222");
         self.debug_reference_count();
@@ -265,8 +275,12 @@ where
             account.storage_root = storage_hash;
             self.update_account_with_hash_state(hashed_address, &account)?;
         }
-
         println!("calculate_hash, 333333333333");
+        self.debug_reference_count();
+
+        self.storage_tries = storage_tries;
+
+        println!("calculate_hash, 444444444444");
         self.debug_reference_count();
 
         self.metrics.record_hash_duration(hash_start.elapsed().as_secs_f64());
