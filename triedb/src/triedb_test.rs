@@ -122,7 +122,7 @@ fn test_update_all_initial(triedb: &mut TrieDB<PathDB>) -> Result<(B256, Option<
             // Call flush and print hash
             if let Some(nodes) = node_set {
                 let difflayer = nodes.to_difflayer();
-                let flush_result = triedb.flush(0, B256::ZERO, Some(difflayer));
+                let flush_result = triedb.flush(0, B256::ZERO, &Some(difflayer));
                 match flush_result {
                     Ok(()) => println!("flush executed successfully"),
                     Err(e) => println!("flush failed: {:?}", e),
@@ -214,7 +214,7 @@ fn test_update_all_modifications(root_hash: B256, difflayer: Option<Arc<MergedNo
                 
                 let difflayer = node_sets.to_difflayer();
                 // Call flush and print hash
-                let flush_result = triedb.flush(0, B256::ZERO, Some(difflayer));
+                let flush_result = triedb.flush(0, B256::ZERO, &Some(difflayer));
                 match flush_result {
                     Ok(()) => println!("Modification flush executed successfully"),
                     Err(e) => println!("Modification flush failed: {:?}", e),

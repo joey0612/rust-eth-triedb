@@ -153,6 +153,28 @@ impl Node {
     }
 }
 
+impl Drop for Node {
+    fn drop(&mut self) {
+        match self {
+            Node::Full(full) => {
+                println!("    Node::Full dropped, data address: {:p}, reference count to : {:?}", Arc::as_ptr(full), Arc::strong_count(full) - 1);  
+            }
+            Node::Short(short) => {
+                println!("    Node::Short dropped, data address: {:p}, reference count to : {:?}", Arc::as_ptr(short), Arc::strong_count(short) - 1);
+            }
+            Node::Hash(_) => {
+                println!("    Node::Hash dropped, node address: {:p}", std::ptr::addr_of!(*self));
+            }
+            Node::Value(_) => {
+                println!("    Node::Value dropped, node address: {:p}", std::ptr::addr_of!(*self));
+            }
+            Node::EmptyRoot => {
+                println!("    Node::EmptyRoot dropped, node address: {:p}", std::ptr::addr_of!(*self));
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

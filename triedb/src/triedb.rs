@@ -1,6 +1,6 @@
 //! Trie database implementation.
 
-use std::sync::{Arc};
+use std::sync::{Arc, Mutex};
 use std::collections::{HashMap, HashSet};
 use rayon::prelude::*;
 use std::time::Instant;
@@ -75,6 +75,7 @@ where
     difflayer: Option<Arc<DiffLayer>>,
     db: DB,
     metrics: TrieDBMetrics,
+    reference_count: Arc<Mutex<usize>>,
 }
 
 impl<DB> Clone for TrieDB<DB>
@@ -83,6 +84,9 @@ where
     DB::Error: std::fmt::Debug,
 {
     fn clone(&self) -> Self {
+        let mut reference_count = self.reference_count.lock().unwrap();
+        *reference_count += 1;
+        println!("clone, 111111111111, reference count: {:?}", *reference_count);
         Self {
             root_hash: EMPTY_ROOT_HASH,
             account_trie: None,
@@ -91,6 +95,7 @@ where
             difflayer: None,
             db: self.db.clone(),
             metrics: self.metrics.clone(),
+            reference_count: Arc::new(Mutex::new(*reference_count)),
         }
     }
 }
@@ -111,6 +116,7 @@ where
             difflayer: None,
             db: db.clone(),
             metrics: TrieDBMetrics::new_with_labels(&[("instance", "default")]),
+            reference_count: Arc::new(Mutex::new(0)),
         }
     }
 
@@ -132,6 +138,37 @@ where
     /// Gets a mutable reference to the database
     pub fn get_mut_db_ref(&mut self) -> &mut DB {
         &mut self.db
+    }
+
+    /// Clean the trie db
+    pub fn clean(&mut self) {
+        self.root_hash = EMPTY_ROOT_HASH;
+        self.account_trie = None;
+        self.storage_tries.clear();
+        self.accounts_with_storage_trie.clear();
+
+        if let Some(difflayer) = &self.difflayer {
+            println!("clean, 111111111111 difflayer, reference count: {:?}", Arc::strong_count(difflayer));
+        } else {
+            println!("clean, 111111111111 difflayer, reference none");
+        }
+        self.difflayer = None;
+    }
+
+    pub fn debug_reference_count(&self) {
+        if let Some(account_trie) = &self.account_trie {
+            println!("     account_trie, reference count: {:?}", Arc::strong_count(account_trie.trie().root()));
+        } else {
+            println!("     account_trie, reference none");
+        }
+        if let Some(difflayer) = &self.difflayer {
+            println!("     difflayer, reference count: {:?}", Arc::strong_count(difflayer));
+        } else {
+            println!("     difflayer, reference none");
+        }
+        for (_, value) in self.storage_tries.iter() {
+            println!("     storage_trie, reference count: {:?}", Arc::strong_count(&value.trie().root()));
+        }
     }
 }
 
@@ -216,6 +253,9 @@ where
     }
 
     pub fn calculate_hash(&mut self) -> Result<B256, TrieDBError> {
+        println!("calculate_hash, 111111111111");
+        self.debug_reference_count();
+
         let hash_start = Instant::now();
 
         let storage_hashes: HashMap<B256, B256> = self.storage_tries
@@ -223,18 +263,31 @@ where
         .map(|(key, trie)| (*key, trie.clone().hash()))
         .collect();
 
+        println!("calculate_hash, 222222222222");
+        self.debug_reference_count();
+
         for (hashed_address, storage_hash) in storage_hashes {   
             let mut account = self.accounts_with_storage_trie.get(&hashed_address).unwrap().clone();
             account.storage_root = storage_hash;
             self.update_account_with_hash_state(hashed_address, &account)?;
         }
 
+        println!("calculate_hash, 333333333333");
+        self.debug_reference_count();
+
         self.metrics.record_hash_duration(hash_start.elapsed().as_secs_f64());
         Ok(self.account_trie.as_mut().unwrap().hash())
     }
 
     pub fn commit(&mut self, _collect_leaf: bool) -> Result<(B256, Arc<MergedNodeSet>), TrieDBError> {
+        
+        println!("commit, 111111111111");
+        self.debug_reference_count();
+
         let root_hash = self.calculate_hash()?;
+
+        println!("commit, 222222222222");
+        self.debug_reference_count();
 
         let commit_start = Instant::now();
         let mut merged_node_set = MergedNodeSet::new();
@@ -251,6 +304,10 @@ where
                 })
                 .collect()
         );
+        drop(account_trie_clone);
+
+        println!("commit, 333333333333");
+        self.debug_reference_count();
 
         let (_, account_node_set) = account_commit_result?;
 
@@ -267,7 +324,11 @@ where
         }
 
         self.metrics.record_commit_duration(commit_start.elapsed().as_secs_f64());
-        Ok((root_hash, Arc::new(merged_node_set))) 
+
+        println!("commit, 444444444444");
+        self.debug_reference_count();
+
+        Ok((root_hash, Arc::new(merged_node_set)))
     }
 }
 
@@ -324,6 +385,15 @@ where
         difflayer: Option<Arc<DiffLayer>>, 
         hashed_post_state: &HashedPostState) -> 
         Result<(B256, Option<Arc<DiffLayer>>), TrieDBError> {
+
+        println!("commit_hashed_post_state, 111111111111");
+        self.debug_reference_count();
+
+        if let Some(ref difflayer) = difflayer {
+            println!("commit_hashed_post_state, 222222222222, difflayer: {:?}", Arc::strong_count(difflayer));
+        } else {
+            println!("commit_hashed_post_state, 222222222222, difflayer: none");
+        }
 
         let mut states: HashMap<alloy_primitives::FixedBytes<32>, Option<StateAccount>> = HashMap::new();
         let mut states_rebuild = HashSet::new();
@@ -402,8 +472,14 @@ where
         storage_states: HashMap<B256, HashMap<B256, Option<U256>>>) -> 
         Result<(B256, Option<Arc<MergedNodeSet>>), TrieDBError> {
 
+        println!("update_and_commit, 111111111111");
+        self.debug_reference_count();
+
         // 1. Reset the trie db state
         self.state_at(root_hash, difflayer)?;
+
+        println!("update_and_commit, 222222222222");
+        self.debug_reference_count();
 
         // 2. Prepare accounts to be updated
         let mut update_accounts = HashMap::new();
@@ -495,8 +571,23 @@ where
         );
         self.storage_tries = update_storage;
 
+        drop(db_clone);
+        drop(difflayer_clone);
+
+        println!("update_and_commit, 333333333333");
+        self.debug_reference_count();
+
         // 5. Commit the changes
         let (root_hash, node_set) = self.commit(true)?;
+
+        println!("update_and_commit, 444444444444");
+        self.debug_reference_count();
+
+        self.clean();
+
+        println!("update_and_commit, 555555555555");
+        self.debug_reference_count();
+
         Ok((root_hash, Some(node_set)))
     }
 }
@@ -508,7 +599,7 @@ where
     DB: TrieDatabase + Clone + Send + Sync,
     DB::Error: std::fmt::Debug,
 {
-    pub fn flush(&mut self, block_number: u64, state_root: B256, update_nodes: Option<Arc<DiffLayer>>) -> Result<(), TrieDBError> {
+    pub fn flush(&mut self, block_number: u64, state_root: B256, update_nodes: &Option<Arc<DiffLayer>>) -> Result<(), TrieDBError> {
         let flush_start = Instant::now();
 
         if let Some(difflayer) = update_nodes {

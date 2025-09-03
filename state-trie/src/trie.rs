@@ -25,6 +25,17 @@ pub struct Trie<DB> {
     difflayer: Option<Arc<DiffLayer>>,
 }
 
+impl<DB> Drop for Trie<DB> {
+    fn drop(&mut self) {
+        println!("Trie dropped, reference count to : {:?}", Arc::strong_count(&self.root) - 1);
+        if let Some(ref difflayer) = self.difflayer {
+            println!("Trie dropped, reference count to difflayer: {:?}", Arc::strong_count(difflayer) - 1);
+        } else {
+            println!("Trie dropped, reference count to difflayer: none");
+        }
+    }
+}
+
 /// Basic Trie operations
 impl<DB> Trie<DB>
 where
@@ -64,8 +75,8 @@ where
     }
 
     /// Gets the root node of the trie
-    pub fn root(&self) -> Arc<Node> {
-        self.root.clone()
+    pub fn root(&self) -> &Arc<Node> {
+        &self.root
     }
 
     /// Gets the root hash of the trie
