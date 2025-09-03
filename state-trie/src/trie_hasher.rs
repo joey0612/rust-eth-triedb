@@ -28,8 +28,9 @@ impl Hasher {
     /// Hash a node and return both the hashed and cached versions
     pub fn hash(&self, node: Arc<Node>, force: bool) -> (Arc<Node>, Arc<Node>) {
         let (hash, _) = node.cache();
-        if !hash.is_none() {
-            return (Arc::new(Node::Hash(hash.unwrap())), node)
+        if let Some(hash) = hash {
+            println!("  Hasher hash, no update, reference count: {:?}, addr: {:p}", Arc::strong_count(&node), &*node as *const super::node::Node);
+            return (Arc::new(Node::Hash(hash)), node)
         }
 
         match &*node {
@@ -100,6 +101,7 @@ impl Hasher {
         }
         let hash = keccak256(rpl_enc);
         // Placeholder hash
+        println!("  short_node_to_hash, addr: {:p}", Arc::as_ptr(&short));
         Node::Hash(hash)
     }
 
@@ -157,6 +159,7 @@ impl Hasher {
             return Node::Full(full);
         }
         let hash = keccak256(rpl_enc);
+        println!("  full_node_to_hash, addr: {:p}", Arc::as_ptr(&full));
         Node::Hash(hash)
     }
 }

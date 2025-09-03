@@ -49,6 +49,7 @@ impl ShortNode {
     /// This method creates an independent copy where val will be cloned
     /// only when it needs to be modified (write-on-copy).
     pub fn to_mutable_copy_with_cow(&self) -> Self {
+        println!("  ShortNode to_mutable_copy_with_cow prepare to drop self, addr: {:p}", std::ptr::addr_of!(*self));
         Self {
             key: self.key.clone(),
             val: self.val.clone(),
@@ -60,7 +61,13 @@ impl ShortNode {
     ///
     /// This method ensures that the child is set without affecting other references.
     pub fn set_value(&mut self, new_node: &Node) {
+        if self.val != Node::empty_root() {
+            println!("  ShortNode set_value prepare to drop, reference count: {:?}, addr: {:p}", Arc::strong_count(&self.val), std::ptr::addr_of!(*self.val));
+        }
         self.val = Arc::new(new_node.clone());
+        if self.val != Node::empty_root() {
+            println!("  ShortNode set_value hold, reference count: {:?}, addr: {:p}", Arc::strong_count(&self.val), std::ptr::addr_of!(*self.val));
+        }
     }
 
     /// Gets a reference to the value node

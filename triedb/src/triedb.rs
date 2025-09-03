@@ -9,7 +9,7 @@ use alloy_primitives::{keccak256, Address, B256, U256};
 use alloy_trie::{EMPTY_ROOT_HASH};
 use reth_trie_common::HashedPostState;
 use rust_eth_triedb_common::TrieDatabase;
-use rust_eth_triedb_state_trie::node::{MergedNodeSet, NodeSet, DiffLayer};
+use rust_eth_triedb_state_trie::node::{MergedNodeSet, NodeSet, DiffLayer, Node};
 use rust_eth_triedb_state_trie::state_trie::StateTrie;
 use rust_eth_triedb_state_trie::account::StateAccount;
 use rust_eth_triedb_state_trie::{SecureTrieId, SecureTrieTrait, SecureTrieBuilder};
@@ -151,7 +151,7 @@ where
 
     pub fn debug_reference_count(&self) {
         if let Some(account_trie) = &self.account_trie {
-            println!("     account_trie, reference count: {:?}", Arc::strong_count(account_trie.trie().root()));
+            println!("     account_trie, addr: {:p}, reference count: {:?}", &**account_trie.trie().root() as *const Node, Arc::strong_count(account_trie.trie().root()));
         } else {
             println!("     account_trie, reference none");
         }
@@ -161,7 +161,7 @@ where
             println!("     difflayer, reference none");
         }
         for (_, value) in self.storage_tries.iter() {
-            println!("     storage_trie, reference count: {:?}", Arc::strong_count(&value.trie().root()));
+            println!("     storage_trie, addr: {:p}, reference count: {:?}", &**value.trie().root() as *const Node, Arc::strong_count(&value.trie().root()));
         }
     }
 }
@@ -298,6 +298,8 @@ where
                 })
                 .collect()
         );
+
+        println!("before drop, account_trie_clone, addr: {:p}, reference count: {:?}", &**account_trie_clone.trie().root() as *const Node, Arc::strong_count(&account_trie_clone.trie().root()));
         drop(account_trie_clone);
 
         println!("commit, 333333333333");

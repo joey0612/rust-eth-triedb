@@ -55,6 +55,7 @@ impl<'a> Committer<'a> {
 
         match node.as_ref() {
             Node::Short(short) => {
+                println!("  commit_internal Cut Short, prepare to drop, reference count: {:?}, addr: {:p}", Arc::strong_count(&short), std::ptr::addr_of!(*short));
                 let mut collapsed = short.to_mutable_copy_with_cow();
 
                 if let Node::Full(_) = short.val.as_ref() {
@@ -68,11 +69,13 @@ impl<'a> Committer<'a> {
                 }
 
                 collapsed.key = hex_to_compact(short.key.as_slice());
+                let new_collapsed = Arc::new(Node::Short(Arc::new(collapsed.clone())));
                 let hn = self.store(
                     path.clone(), 
-                    Arc::new(Node::Short(Arc::new(collapsed.clone()))));
+                    new_collapsed.clone());
 
                 if let Node::Hash(hash) = hn.as_ref() {
+                    println!("  commit_internal Cut Short, prepare to drop, reference count: {:?}, addr: {:p}", Arc::strong_count(&new_collapsed), std::ptr::addr_of!(*new_collapsed));
                     return Arc::new(Node::Hash(*hash));
                 }
                 return Arc::new(Node::Short(Arc::new(collapsed)));
@@ -83,14 +86,17 @@ impl<'a> Committer<'a> {
                     full.clone(), 
                     parallel);
 
+                println!("  commit_internal Cut Full, prepare to drop, reference count: {:?}, addr: {:p}", Arc::strong_count(&full), std::ptr::addr_of!(*full));
                 let mut collapsed = full.to_mutable_copy_with_cow();
                 collapsed.children = hashed_children;
 
+                let new_collapsed = Arc::new(Node::Full(Arc::new(collapsed.clone())));
                 let hn = self.store(
                     path.clone(), 
-                    Arc::new(Node::Full(Arc::new(collapsed.clone()))));
+                    new_collapsed.clone());
 
                 if let Node::Hash(hash) = hn.as_ref() {
+                    println!("  commit_internal Cut Full, prepare to drop, reference count: {:?}, addr: {:p}", Arc::strong_count(&new_collapsed), std::ptr::addr_of!(*new_collapsed)); 
                     return Arc::new(Node::Hash(*hash));
                 }
                 return Arc::new(Node::Full(Arc::new(collapsed)));

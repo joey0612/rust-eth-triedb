@@ -159,10 +159,10 @@ impl Drop for Node {
     fn drop(&mut self) {
         match self {
             Node::Full(full) => {
-                println!("    Node::Full dropped, data address: {:p}, reference count to : {:?}", Arc::as_ptr(full), Arc::strong_count(full) - 1);  
+                println!("    Node::Full dropped, data address: {:p}, reference count to : {:?}", &**full as *const super::full_node::FullNode, Arc::strong_count(full) - 1);  
             }
             Node::Short(short) => {
-                println!("    Node::Short dropped, data address: {:p}, reference count to : {:?}", Arc::as_ptr(short), Arc::strong_count(short) - 1);
+                println!("    Node::Short dropped, data address: {:p}, reference count to : {:?}", &**short as *const super::short_node::ShortNode, Arc::strong_count(short) - 1);
             }
             Node::Hash(_) => {
                 println!("    Node::Hash dropped, node address: {:p}", std::ptr::addr_of!(*self));
