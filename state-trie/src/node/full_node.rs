@@ -19,6 +19,12 @@ pub struct FullNode {
     pub flags: NodeFlag,
 }
 
+impl Drop for FullNode {
+    fn drop(&mut self) {
+        println!("    FullNode dropped, data address: {:p}", std::ptr::addr_of!(*self));
+    }
+}
+
 impl FullNode {
     /// Creates a new empty full node
     pub fn new() -> Self {

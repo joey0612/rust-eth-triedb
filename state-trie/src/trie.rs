@@ -27,12 +27,35 @@ pub struct Trie<DB> {
 
 impl<DB> Drop for Trie<DB> {
     fn drop(&mut self) {
-        println!("Trie dropped, addr: {:p}, reference count to : {:?}", &*self.root as *const Node, Arc::strong_count(&self.root) - 1);
+        println!("Trie drop start, root addr: {:p}, ref count: {:?}, type: {:?}", &*self.root as *const Node, Arc::strong_count(&self.root) - 1, std::any::type_name_of_val(&*self.root));
+        
+        match &*self.root {
+            Node::Full(full) => {
+                println!("Trie drop start, full node, addr: {:p}, ref count: {:?}, type: full", &**full as *const super::node::FullNode, Arc::strong_count(full) - 1);
+            }
+            Node::Short(short) => {
+                println!("Trie drop start, short node, addr: {:p}, ref count: {:?}, type: short", &**short as *const super::node::ShortNode, Arc::strong_count(short) - 1);
+            }
+            Node::Hash(hash) => {
+                println!("Trie drop start, hash node, addr: {:p}, type: hash", std::ptr::addr_of!(*hash));
+            }
+            Node::Value(value) => {
+                println!("Trie drop start, value node, addr: {:p}, type: value", std::ptr::addr_of!(*value));
+            }
+            Node::Empty => {
+                println!("Trie drop start, other node, addr: {:p}, type: empty", std::ptr::addr_of!(*self.root));
+            }
+        }
+
+        // 检测循环引用
+        self.detect_circular_references();
+        
         if let Some(ref difflayer) = self.difflayer {
             println!("Trie dropped, reference count to difflayer: {:?}", Arc::strong_count(difflayer) - 1);
         } else {
             println!("Trie dropped, reference count to difflayer: none");
         }
+        println!("Trie drop end");
     }
 }
 
@@ -86,6 +109,8 @@ where
     pub fn root(&self) -> &Arc<Node> {
         &self.root
     }
+
+
 
     /// Gets the root hash of the trie
     pub fn hash(&mut self) -> B256 {
@@ -952,4 +977,66 @@ where
             }
         }
     }
+}
+
+// General implementation without trait bounds
+impl<DB> Trie<DB> {
+    /// 检测循环引用
+    fn detect_circular_references(&self) {
+        println!("🔍 检测循环引用...");
+        
+        // 检查 empty_root 的引用计数
+        let empty_root = Node::empty_root();
+        let empty_count = Arc::strong_count(&empty_root);
+        println!("  EmptyRoot 全局引用计数: {}", empty_count);
+        
+        // 检查当前 root 的引用计数
+        let root_count = Arc::strong_count(&self.root);
+        println!("  当前 Root 引用计数: {}", root_count);
+        
+        // 如果引用计数 > 1，可能存在循环引用
+        if root_count > 1 {
+            println!("  ⚠️  检测到可能的循环引用！Root 引用计数: {}", root_count);
+            self.analyze_node_references(&self.root, 0, 10); // 最多递归3层
+        }
+    }
+    
+    /// 分析节点引用关系
+    fn analyze_node_references(&self, node: &Arc<Node>, depth: usize, max_depth: usize) {
+        if depth >= max_depth {
+            return;
+        }
+        
+        let indent = "  ".repeat(depth + 1);
+        let count = Arc::strong_count(node);
+        println!("{}节点引用计数: {}, 地址: {:p}", indent, count, &**node as *const Node);
+        
+        match &**node {
+            Node::Full(full) => {
+                println!("{}FullNode 子节点引用分析:", indent);
+                for (i, child) in full.children.iter().enumerate() {
+                    let child_count = Arc::strong_count(child);
+                    if child_count > 1 {
+                        println!("{}  子节点[{}] 引用计数: {}, 地址: {:p}", 
+                                indent, i, child_count, &**child as *const Node);
+                        if depth < max_depth - 1 {
+                            self.analyze_node_references(child, depth + 1, max_depth);
+                        }
+                    }
+                }
+            }
+            Node::Short(short) => {
+                let val_count = Arc::strong_count(&short.val);
+                if val_count > 1 {
+                    println!("{}ShortNode 值节点引用计数: {}, 地址: {:p}", 
+                            indent, val_count, &*short.val as *const Node);
+                    if depth < max_depth - 1 {
+                        self.analyze_node_references(&short.val, depth + 1, max_depth);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
 }
