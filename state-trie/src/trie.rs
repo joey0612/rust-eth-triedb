@@ -468,6 +468,7 @@ where
 
                 // Create a branch node to split the short node
                 let mut branch = FullNode::new();
+                println!("  insert_internal new  branch, addr: {:p}", &branch as *const super::node::FullNode);
 
                 // Insert the short node's remaining key into the branch
                 let mut short_prefix = prefix.clone();
@@ -494,7 +495,9 @@ where
 
                 // If no common prefix, return the branch directly
                 if matchlen == 0 {
-                    return Ok((true, Arc::new(Node::Full(Arc::new(branch)))));
+                    let node = Arc::new(Node::Full(Arc::new(branch)));
+                    println!("  insert_internal Short 222222, new_node, addr: {:p}", &*node as *const super::node::Node);
+                    return Ok((true, node));
                 }
 
                 // Create a new short node with the common prefix
@@ -737,8 +740,9 @@ where
                                 val: full_copy.get_child(non_empty_pos as usize),
                                 flags: self.new_flag(),
                             };
-                            println!("  delete_internal Full Empty, new_node, addr: {:p}", &new_short as *const super::node::ShortNode);
-                            Ok((true, Arc::new(Node::Short(Arc::new(new_short)))))
+                            let node = Arc::new(Node::Short(Arc::new(new_short)));
+                            println!("  delete_internal Full Empty, new_node, addr: {:p}", &*node as *const super::node::Node);
+                            Ok((true, node))
                         } else {
                             // Multiple children remain - keep as FullNode
                             Ok((true, Arc::new(Node::Full(Arc::new(full_copy)))))
@@ -746,7 +750,9 @@ where
                     }
                     _ => {
                         // Child is not empty - keep as FullNode
-                        Ok((true, Arc::new(Node::Full(Arc::new(full_copy)))))
+                        let node = Arc::new(Node::Full(Arc::new(full_copy)));
+                        println!("  delete_internal Full Empty, new_node, addr: {:p}", &*node as *const super::node::Node);
+                        Ok((true, node))
                     }
                 }
             }

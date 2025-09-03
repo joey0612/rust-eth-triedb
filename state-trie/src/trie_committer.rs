@@ -91,6 +91,7 @@ impl<'a> Committer<'a> {
                 collapsed.children = hashed_children;
 
                 let new_collapsed = Arc::new(Node::Full(Arc::new(collapsed.clone())));
+                println!("  commit_internal Cut Full, new_collapsed, addr: {:p}", &*new_collapsed as *const super::node::Node);
                 let hn = self.store(
                     path.clone(), 
                     new_collapsed.clone());
@@ -99,7 +100,9 @@ impl<'a> Committer<'a> {
                     println!("  commit_internal Cut Full, prepare to drop, reference count: {:?}, addr: {:p}", Arc::strong_count(&new_collapsed), std::ptr::addr_of!(*new_collapsed)); 
                     return Arc::new(Node::Hash(*hash));
                 }
-                return Arc::new(Node::Full(Arc::new(collapsed)));
+                let node = Arc::new(Node::Full(Arc::new(collapsed)));
+                println!("  commit_internal Cut Full, node, addr: {:p}", &*node as *const super::node::Node);
+                return node;
             }
             Node::Hash(_) => {
                 return node;

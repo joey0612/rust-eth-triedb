@@ -117,7 +117,9 @@ impl Node {
             }
             17 => {
                 let full_node = FullNode::from_rlp(elements, hash)?;
-                Ok(Arc::new(Node::Full(Arc::new(full_node))))
+                let node = Arc::new(Node::Full(Arc::new(full_node)));
+                println!("  Node decode_node Full, node, addr: {:p}", &*node as *const super::node::Node);
+                Ok(node)
             }
             _ => {
                 Err(RlpError::Custom("Invalid number of list elements"))

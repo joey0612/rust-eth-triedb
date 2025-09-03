@@ -65,7 +65,9 @@ impl Hasher {
                     }
                 }
 
-                (Arc::new(hashed), Arc::new(Node::Full(Arc::new(cached))))
+                let node = Arc::new(Node::Full(Arc::new(cached)));
+                println!("  Hasher hash, Full, node, addr: {:p}", &*node as *const super::node::Node);
+                (Arc::new(hashed), node)
             }
             _ => {
                 (node.clone(), node)
