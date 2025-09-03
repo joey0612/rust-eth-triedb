@@ -73,7 +73,7 @@ where
     storage_tries: HashMap<B256, StateTrie<DB>>,
     accounts_with_storage_trie: HashMap<B256, StateAccount>,
     difflayer: Option<Arc<DiffLayer>>,
-    db: DB,
+    pub db: DB,
     metrics: TrieDBMetrics,
 }
 
