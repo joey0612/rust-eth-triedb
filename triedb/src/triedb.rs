@@ -1,6 +1,6 @@
 //! Trie database implementation.
 
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 use std::collections::{HashMap, HashSet};
 use rayon::prelude::*;
 use std::time::Instant;
@@ -75,7 +75,6 @@ where
     difflayer: Option<Arc<DiffLayer>>,
     db: DB,
     metrics: TrieDBMetrics,
-    reference_count: Arc<Mutex<usize>>,
 }
 
 impl<DB> Clone for TrieDB<DB>
@@ -84,9 +83,6 @@ where
     DB::Error: std::fmt::Debug,
 {
     fn clone(&self) -> Self {
-        let mut reference_count = self.reference_count.lock().unwrap();
-        *reference_count += 1;
-        println!("clone, 111111111111, reference count: {:?}", *reference_count);
         Self {
             root_hash: EMPTY_ROOT_HASH,
             account_trie: None,
@@ -94,8 +90,7 @@ where
             accounts_with_storage_trie: HashMap::new(),
             difflayer: None,
             db: self.db.clone(),
-            metrics: self.metrics.clone(),
-            reference_count: Arc::new(Mutex::new(*reference_count)),
+            metrics: self.metrics.clone()
         }
     }
 }
@@ -116,7 +111,6 @@ where
             difflayer: None,
             db: db.clone(),
             metrics: TrieDBMetrics::new_with_labels(&[("instance", "default")]),
-            reference_count: Arc::new(Mutex::new(0)),
         }
     }
 

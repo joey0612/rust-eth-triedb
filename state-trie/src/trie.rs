@@ -127,11 +127,13 @@ where
             }
         }
 
-        self.root = Committer::new(nodes.clone(), &self.tracer, collect_leaf)
-            .commit(
-                self.root.clone(), 
-                self.unhashed > 100
-            );
+        {
+            self.root = Committer::new(nodes.clone(), &self.tracer, collect_leaf)
+                .commit(
+                    self.root.clone(), 
+                    self.unhashed > 100
+                );
+        }
 
         // Extract the final NodeSet for returning
         let nodeset = {
@@ -140,6 +142,8 @@ where
         };
         self.uncommitted = 0;
         self.committed = true;
+
+        println!("trie commit internal, nodeset, strong count: {:?}", Arc::strong_count(&nodes));
 
         return Ok((root_hash, Some(nodeset)))
     }
@@ -300,6 +304,7 @@ where
                     let mut new_short = short.to_mutable_copy_with_cow();
                     new_short.set_value(&new_child);
                     let new_node = Arc::new(Node::Short(Arc::new(new_short)));
+                    println!("get_internal Short, new_node, addr: {:p}", Arc::as_ptr(&new_node));
                     Ok((value, new_node, true))
                 } else {
                     Ok((value, node, false))
@@ -321,6 +326,7 @@ where
                     let mut new_full = full.to_mutable_copy_with_cow();
                     new_full.set_child(nibble, &new_child);
                     let new_node = Arc::new(Node::Full(Arc::new(new_full)));
+                    println!("get_internal Full, new_node, addr: {:p}", Arc::as_ptr(&new_node));
                     Ok((value, new_node, true))
                 } else {
                     Ok((value, node, false))
@@ -398,6 +404,7 @@ where
                             val: new_child,
                             flags: self.new_flag(),
                         };
+                        println!("insert_internal Short 111111, new_node, addr: {:p}", &new_short as *const _);
                         return Ok((true, Arc::new(Node::Short(Arc::new(new_short)))));
                     }
                 }
@@ -440,6 +447,7 @@ where
                     flags: self.new_flag(),
                 };
 
+                println!("insert_internal Short 222222, new_node, addr: {:p}", &new_short as *const _);
                 // Trace the insert operation
                 let mut trace_path = prefix.clone();
                 trace_path.extend_from_slice(&nibbles_key[..matchlen]);
@@ -467,6 +475,7 @@ where
                     let mut new_full = full.to_mutable_copy_with_cow();
                     new_full.flags = self.new_flag();
                     new_full.set_child(nibbles_key[0] as usize, &new_child);
+                    println!("insert_internal Full, new_node, addr: {:p}", &new_full as *const _);
                     return Ok((true, Arc::new(Node::Full(Arc::new(new_full)))));
                 }
             }
@@ -478,6 +487,7 @@ where
                 self.tracer.on_insert(prefix.clone());
 
                 let new_short = ShortNode::new(nibbles_key, value.as_ref());
+                println!("insert_internal EmptyRoot, new_node, addr: {:p}", &new_short as *const _);
                 return Ok((true, Arc::new(Node::Short(Arc::new(new_short)))));
             }
 
@@ -565,6 +575,7 @@ where
                             val: new_child_short.val.clone(),
                             flags: self.new_flag(),
                         };
+                        println!("delete_internal Short, new_node, addr: {:p}", &new_short as *const _);
                         Ok((true, Arc::new(Node::Short(Arc::new(new_short)))))
                     }
                     _ => {
@@ -574,6 +585,7 @@ where
                             val: new_child,
                             flags: self.new_flag(),
                         };
+                        println!("delete_internal other, new_node, addr: {:p}", &new_short as *const _);
                         Ok((true, Arc::new(Node::Short(Arc::new(new_short)))))
                     }
                 }
@@ -654,6 +666,7 @@ where
                                         val: child_short.val.clone(),
                                         flags: self.new_flag(),
                                     };
+                                    println!("delete_internal Full Empty Short, new_node, addr: {:p}", &new_short as *const _);
                                     return Ok((true, Arc::new(Node::Short(Arc::new(new_short)))));
                                 }
                             }
@@ -664,6 +677,7 @@ where
                                 val: full_copy.get_child(non_empty_pos as usize),
                                 flags: self.new_flag(),
                             };
+                            println!("delete_internal Full Empty, new_node, addr: {:p}", &new_short as *const _);
                             Ok((true, Arc::new(Node::Short(Arc::new(new_short)))))
                         } else {
                             // Multiple children remain - keep as FullNode
@@ -739,7 +753,9 @@ where
         if let Some(difflayer) = &self.difflayer {
             if let Some(node) = difflayer.get(&key) {
                 self.tracer.on_read(prefix, node.blob.clone().unwrap());
-                return Ok(Node::must_decode_node(Some(*hash), &node.blob.clone().unwrap()));
+                let node= Node::must_decode_node(Some(*hash), &node.blob.clone().unwrap());
+                println!("resolve_and_track, new_node 1111, addr: {:p}", Arc::as_ptr(&node));
+                return Ok(node);
             }
         }
 
@@ -747,6 +763,7 @@ where
         if let Some(node_blob) = self.database.get(&key).map_err(|e| SecureTrieError::Database(format!("{:?}", e)))? {
             self.tracer.on_read(prefix, node_blob.clone());
             let node = Node::must_decode_node(Some(*hash), &node_blob);
+            println!("resolve_and_track, new_node 2222, addr: {:p}", Arc::as_ptr(&node));
             return Ok(node);
         }
 
