@@ -1,9 +1,12 @@
 // use crate::reth_trie_state_root::RethTrieStateRootPreparer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use crate::SmokeTest;
+use rust_eth_triedb_state_trie::node::init_empty_root_node;
 
 #[test]
 fn test_state_trie_smoke_test() -> Result<(), Box<dyn std::error::Error>> {
+    init_empty_root_node();
+
     // Initialize logging with info level (exclude trace logs)
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer())
@@ -41,6 +44,7 @@ fn test_state_trie_smoke_test() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn test_storage_trie_smoke_test() -> Result<(), Box<dyn std::error::Error>> {
+    init_empty_root_node();
     // Initialize logging with info level (exclude trace logs)
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer())

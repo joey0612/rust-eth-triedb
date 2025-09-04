@@ -49,6 +49,26 @@ pub type ValueNode = Vec<u8>;
 
 static EMPTY_ROOT_NODE: OnceLock<Arc<Node>> = OnceLock::new();
 
+// Initialize the empty root node.
+/// 
+/// This function must be called once at application startup before any calls to `Node::empty_root()`.
+/// Returns an error if the empty root node has already been initialized.
+pub fn init_empty_root_node() {
+    EMPTY_ROOT_NODE.get_or_init(|| Arc::new(Node::Empty));
+}
+
+/// Get the initialized empty root node instance.
+/// 
+/// This function returns a reference to the pre-initialized empty root node.
+/// The empty root node must be initialized first by calling `init_empty_root_node()`.
+/// 
+/// # Panics
+/// 
+/// This function will panic if `init_empty_root_node()` has not been called first.
+pub fn get_empty_root_node() -> &'static Arc<Node> {
+    EMPTY_ROOT_NODE.get()
+        .expect("Empty root node not initialized. Call init_empty_root_node() first.")
+}
 
 /// Node types in the BSC-style trie
 #[derive(Debug, Clone, PartialEq)]
@@ -68,7 +88,7 @@ pub enum Node {
 impl Node {
     /// Get the empty root node
     pub fn empty_root() -> Arc<Node> {
-        EMPTY_ROOT_NODE.get_or_init(|| Arc::new(Node::Empty)).clone()
+        get_empty_root_node().clone()
     }
 
     /// Get the cached hash and dirty state
@@ -164,6 +184,8 @@ mod tests {
 
     #[test]
     fn fullnode_roundtrip_basic() {
+        init_empty_root_node();
+
         // Build a simple full node with only value (17th) set
         let mut original = FullNode::new();
         let value_bytes = vec![0xAA, 0xBB, 0xCC];

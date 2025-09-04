@@ -12,4 +12,4 @@ mod triedb_test;
 // Re-export main types
 pub use triedb::TrieDB;
 pub use triedb::TrieDBError;
-pub use triedb_manager::get_global_triedb;
+pub use triedb_manager::{init_global_manager, get_global_triedb};

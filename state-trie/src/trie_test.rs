@@ -4,11 +4,13 @@ use alloy_primitives::{B256, keccak256};
 use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
 use crate::secure_trie::{SecureTrieBuilder, SecureTrieId};
 use crate::traits::SecureTrieTrait;
-
+use super::node::init_empty_root_node;
 use std::env;
 
 #[test]
 fn test_trie_update_and_get() {
+    init_empty_root_node();
+
     // Create temporary directory path
     let temp_dir = env::temp_dir().join("trie_test_pathdb");
     let db_path = temp_dir.to_str().unwrap();
@@ -197,6 +199,8 @@ fn test_trie_nonexistent_key() {
 
 #[test]
 fn test_trie_binary_data() {
+    init_empty_root_node();
+
     // Create temporary directory path
     let temp_dir = env::temp_dir().join("trie_test_binary");
     let db_path = temp_dir.to_str().unwrap();

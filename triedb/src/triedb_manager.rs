@@ -6,6 +6,7 @@
 use std::sync::{OnceLock};
 use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
 use super::TrieDB;
+use rust_eth_triedb_state_trie::node::init_empty_root_node;
 
 /// Global TrieDB Manager
 /// 
@@ -18,13 +19,31 @@ pub struct TrieDBManager {
 // Global singleton instance - automatically initialized on first access
 static MANAGER_INSTANCE: OnceLock<TrieDBManager> = OnceLock::new();
 
-// Auto-initialization function
-fn get_or_init_manager() -> &'static TrieDBManager {
-    MANAGER_INSTANCE.get_or_init(|| TrieDBManager::new())
+/// Initialize the global manager instance.
+/// 
+/// This function must be called once at application startup before any calls to `get_global_triedb()`.
+/// Returns an error if the manager has already been initialized.
+pub fn init_global_manager() {
+    init_empty_root_node();
+    MANAGER_INSTANCE.get_or_init(|| TrieDBManager::new());
 }
 
+// Get the initialized manager instance
+fn get_manager() -> &'static TrieDBManager {
+    MANAGER_INSTANCE.get()
+        .expect("Global TrieDB manager not initialized. Call init_global_manager() first.")
+}
+
+/// Get the global TrieDB instance.
+/// 
+/// This function returns a clone of the global TrieDB instance.
+/// The global manager must be initialized first by calling `init_global_manager()`.
+/// 
+/// # Panics
+/// 
+/// This function will panic if `init_global_manager()` has not been called first.
 pub fn get_global_triedb() -> TrieDB<PathDB> {
-    get_or_init_manager().get_triedb()
+    get_manager().get_triedb()
 }
 
 impl TrieDBManager {

@@ -4,7 +4,7 @@ use std::str::FromStr;
 use alloy_primitives::{keccak256, Address, B256, U256};
 use alloy_trie::{EMPTY_ROOT_HASH};
 use rust_eth_triedb_state_trie::account::StateAccount;
-use rust_eth_triedb_state_trie::node::MergedNodeSet;
+use rust_eth_triedb_state_trie::node::{MergedNodeSet, init_empty_root_node};
 use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
 use crate::{TrieDB, TrieDBError};
 use tempfile::TempDir;
@@ -13,6 +13,8 @@ use once_cell::sync::Lazy;
 /// Test basic TrieDB functionality
 #[test]
 fn test_triedb_update_all_operations_without_difflayer() {
+    init_empty_root_node();
+
     // Create temporary directory for database
     let temp_dir = TempDir::new().expect("Failed to create temp directory");
     let db_path = temp_dir.path().to_str().unwrap();
