@@ -9,7 +9,7 @@ use alloy_primitives::{keccak256, Address, B256, U256};
 use alloy_trie::{EMPTY_ROOT_HASH};
 use reth_trie_common::HashedPostState;
 use rust_eth_triedb_common::TrieDatabase;
-use rust_eth_triedb_state_trie::node::{MergedNodeSet, NodeSet, DiffLayer};
+use rust_eth_triedb_state_trie::node::{MergedNodeSet, NodeSet, DiffLayer, get_global_node_reference_manager};
 use rust_eth_triedb_state_trie::state_trie::StateTrie;
 use rust_eth_triedb_state_trie::account::StateAccount;
 use rust_eth_triedb_state_trie::{SecureTrieId, SecureTrieTrait, SecureTrieBuilder};
@@ -141,6 +141,7 @@ where
         self.storage_tries.clear();
         self.accounts_with_storage_trie.clear();
         self.difflayer = None;
+        get_global_node_reference_manager().debug_print();
     }
 }
 
@@ -247,7 +248,6 @@ where
             account.storage_root = storage_hash;
             self.update_account_with_hash_state(hashed_address, &account)?;
         }
-
         self.storage_tries = storage_tries;
 
         self.metrics.record_hash_duration(hash_start.elapsed().as_secs_f64());

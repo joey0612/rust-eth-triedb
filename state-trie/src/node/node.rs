@@ -5,7 +5,8 @@
 
 #[allow(unused_imports)]
 use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable, Error as RlpError};
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, OnceLock, Mutex};
+use std::collections::HashMap;
 use alloy_primitives::B256;
 
 use super::{FullNode, ShortNode};
@@ -173,6 +174,126 @@ impl Node {
             // Invalid string length
             _ => Err(RlpError::Custom("invalid RLP string size, want 0 or 32 bytes")),
         }
+    }
+}
+
+impl Drop for Node {
+    fn drop(&mut self) {
+        get_global_node_reference_manager().drop_node(self);
+    }
+}
+
+static NODE_REFERENCE_MANAGER: OnceLock<NodeReferenceManager> = OnceLock::new();
+
+/// Get the initialized global node reference manager instance.
+pub fn get_global_node_reference_manager() -> &'static NodeReferenceManager {
+    NODE_REFERENCE_MANAGER.get_or_init(|| NodeReferenceManager::new())
+}
+
+pub struct NodeReferenceManager {
+    alloc_full_nodes: Arc<Mutex<HashMap<usize, String>>>,
+    alloc_short_nodes: Arc<Mutex<HashMap<usize, String>>>,
+    
+    alloc_full_count: Arc<Mutex<usize>>,
+    alloc_short_count: Arc<Mutex<usize>>,
+
+    drop_more_full_count: Arc<Mutex<usize>>,
+    drop_more_short_count: Arc<Mutex<usize>>,
+}
+
+impl NodeReferenceManager {
+    pub fn new() -> Self {
+        Self {
+            alloc_full_nodes: Arc::new(Mutex::new(HashMap::new())),
+            alloc_short_nodes: Arc::new(Mutex::new(HashMap::new())),
+            alloc_full_count: Arc::new(Mutex::new(0)),
+            alloc_short_count: Arc::new(Mutex::new(0)),
+            drop_more_full_count: Arc::new(Mutex::new(0)),
+            drop_more_short_count: Arc::new(Mutex::new(0)),
+        }
+    }
+
+    pub fn add_arc_node(&self, node: &Arc<Node>, remark: String) {
+        match node.as_ref() {
+            Node::Full(full) => {
+                let key = &**full as *const super::full_node::FullNode as usize;
+                let mut map = self.alloc_full_nodes.lock().unwrap();
+                if map.contains_key(&key) {
+                    let old_remark = map.get(&key).unwrap();
+                    println!("  Warn!!!!! add_arc_node, full node already in alloc_full_nodes, key: {:?}, old_remark: {:?}, new_remark: {:?}", key, old_remark, remark);
+                }
+                map.insert(key, remark);
+                *self.alloc_full_count.lock().unwrap() += 1;
+            }
+            Node::Short(short) => {
+                let key = &**short as *const super::short_node::ShortNode as usize;
+                let mut map = self.alloc_short_nodes.lock().unwrap();
+                if map.contains_key(&key) {
+                    let old_remark = map.get(&key).unwrap();
+                    println!("  Warn!!!!! add_arc_node, short node already in alloc_short_nodes, key: {:?}, old_remark: {:?}, new_remark: {:?}", key, old_remark, remark);
+                }
+                map.insert(key, remark);
+                *self.alloc_short_count.lock().unwrap() += 1;
+            }
+            _ => {}
+        }
+    }
+
+    pub fn add_full_node(&self, full: &FullNode, remark: String) {
+        let key = full as *const super::full_node::FullNode as usize;
+        let mut map = self.alloc_full_nodes.lock().unwrap();
+        if map.contains_key(&key) {
+            let old_remark = map.get(&key).unwrap();
+            println!("Warn!!!!! add_full_node, full node already in alloc_full_nodes, key: {:?}, old_remark: {:?}, new_remark: {:?}", key, old_remark, remark);
+        }
+        map.insert(key, remark);
+        *self.alloc_full_count.lock().unwrap() += 1;
+    }
+
+    pub fn add_short_node(&self, short: &ShortNode, remark: String) {
+        let key = short as *const super::short_node::ShortNode as usize;
+        let mut map = self.alloc_short_nodes.lock().unwrap();
+        if map.contains_key(&key) {
+            let old_remark = map.get(&key).unwrap();
+            println!("Warn!!!!! add_short_node, short node already in alloc_short_nodes, key: {:?}, old_remark: {:?}, new_remark: {:?}", key, old_remark, remark);
+        }
+        map.insert(key, remark);
+        *self.alloc_short_count.lock().unwrap() += 1;
+    }
+    
+    pub fn drop_node(&self, node: &Node) {
+        match node {
+            Node::Full(full) => {
+                if Arc::strong_count(full) - 1 == 0 {
+                    let key = &**full as *const super::full_node::FullNode as usize;
+                    if self.alloc_full_nodes.lock().unwrap().remove(&key).is_none() {
+                        *self.drop_more_full_count.lock().unwrap() += 1;
+                    }
+                }
+            }
+            Node::Short(short) => {
+                if Arc::strong_count(short) - 1 == 0 {
+                    let key = &**short as *const super::short_node::ShortNode as usize;
+                    if self.alloc_short_nodes.lock().unwrap().remove(&key).is_none() {
+                        *self.drop_more_short_count.lock().unwrap() += 1;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    pub fn debug_print(&self) {
+        println!("NodeReferenceManager debug_print, alloc_full_nodes_reserved: {:?}, alloc_short_nodes_reserved: {:?}, alloc_full_count: {:?}, alloc_short_count: {:?}, drop_more_full_count: {:?}, drop_more_short_count: {:?}", 
+        self.alloc_full_nodes.lock().unwrap().len(), self.alloc_short_nodes.lock().unwrap().len(), self.alloc_full_count.lock().unwrap(), self.alloc_short_count.lock().unwrap(), self.drop_more_full_count.lock().unwrap(), self.drop_more_short_count.lock().unwrap());
+        
+        if !self.alloc_full_nodes.lock().unwrap().is_empty() {
+            println!("alloc_full_nodes, no drop: {:?}", self.alloc_full_nodes.lock().unwrap());
+        }
+        if !self.alloc_short_nodes.lock().unwrap().is_empty() {
+            println!("alloc_short_nodes, no drop: {:?}", self.alloc_short_nodes.lock().unwrap());
+        }
+        println!("NodeReferenceManager debug_print, done");
     }
 }
 
