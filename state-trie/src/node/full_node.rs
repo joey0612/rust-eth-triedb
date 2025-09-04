@@ -19,12 +19,6 @@ pub struct FullNode {
     pub flags: NodeFlag,
 }
 
-impl Drop for FullNode {
-    fn drop(&mut self) {
-        println!("    FullNode dropped, data address: {:p}", std::ptr::addr_of!(*self));
-    }
-}
-
 impl FullNode {
     /// Creates a new empty full node
     pub fn new() -> Self {
@@ -44,7 +38,6 @@ impl FullNode {
     /// This method creates an independent copy where children will be cloned
     /// only when they need to be modified (write-on-copy).
     pub fn to_mutable_copy_with_cow(&self) -> Self {
-        println!("  FullNode to_mutable_copy_with_cow prepare to drop self, addr: {:p}", std::ptr::addr_of!(*self));
         Self {
             children: self.children.clone(), // 初始共享，写时复制
             flags: self.flags.clone(),
@@ -55,13 +48,7 @@ impl FullNode {
     ///
     /// This method ensures that the child is set without affecting other references.
     pub fn set_child(&mut self, index: usize, new_node: &Node) {
-        if self.children[index] != Node::empty_root() {
-            println!("  FullNode set_child prepare to drop, reference count: {:?}, addr: {:p}", Arc::strong_count(&self.children[index]), std::ptr::addr_of!(*self.children[index]));
-        }
         self.children[index] = Arc::new(new_node.clone());
-        if self.children[index] != Node::empty_root() {
-            println!("  FullNode set_child hold, reference count: {:?}, addr: {:p}", Arc::strong_count(&self.children[index]), std::ptr::addr_of!(*self.children[index]));
-        }
     }
 
     /// Gets a mutable reference to the flags

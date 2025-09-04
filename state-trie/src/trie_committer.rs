@@ -55,7 +55,6 @@ impl<'a> Committer<'a> {
 
         match node.as_ref() {
             Node::Short(short) => {
-                println!("  commit_internal Cut Short, prepare to drop, reference count: {:?}, addr: {:p}", Arc::strong_count(&short), std::ptr::addr_of!(*short));
                 let mut collapsed = short.to_mutable_copy_with_cow();
 
                 if let Node::Full(_) = short.val.as_ref() {
@@ -75,7 +74,6 @@ impl<'a> Committer<'a> {
                     new_collapsed.clone());
 
                 if let Node::Hash(hash) = hn.as_ref() {
-                    println!("  commit_internal Cut Short, prepare to drop, reference count: {:?}, addr: {:p}", Arc::strong_count(&new_collapsed), std::ptr::addr_of!(*new_collapsed));
                     return Arc::new(Node::Hash(*hash));
                 }
                 return Arc::new(Node::Short(Arc::new(collapsed)));
@@ -86,22 +84,18 @@ impl<'a> Committer<'a> {
                     full.clone(), 
                     parallel);
 
-                println!("  commit_internal Cut Full, prepare to drop, reference count: {:?}, addr: {:p}", Arc::strong_count(&full), std::ptr::addr_of!(*full));
                 let mut collapsed = full.to_mutable_copy_with_cow();
                 collapsed.children = hashed_children;
 
                 let new_collapsed = Arc::new(Node::Full(Arc::new(collapsed.clone())));
-                println!("  commit_internal Cut Full, new_collapsed, addr: {:p}", &*new_collapsed as *const super::node::Node);
                 let hn = self.store(
                     path.clone(), 
                     new_collapsed.clone());
 
                 if let Node::Hash(hash) = hn.as_ref() {
-                    println!("  commit_internal Cut Full, prepare to drop, reference count: {:?}, addr: {:p}", Arc::strong_count(&new_collapsed), std::ptr::addr_of!(*new_collapsed)); 
                     return Arc::new(Node::Hash(*hash));
                 }
                 let node = Arc::new(Node::Full(Arc::new(collapsed)));
-                println!("  commit_internal Cut Full, node, addr: {:p}", &*node as *const super::node::Node);
                 return node;
             }
             Node::Hash(_) => {

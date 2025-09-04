@@ -25,40 +25,6 @@ pub struct Trie<DB> {
     difflayer: Option<Arc<DiffLayer>>,
 }
 
-impl<DB> Drop for Trie<DB> {
-    fn drop(&mut self) {
-        println!("Trie drop start, root addr: {:p}, ref count: {:?}, type: {:?}", &*self.root as *const Node, Arc::strong_count(&self.root) - 1, std::any::type_name_of_val(&*self.root));
-        
-        match &*self.root {
-            Node::Full(full) => {
-                println!("Trie drop start, full node, addr: {:p}, ref count: {:?}, type: full", &**full as *const super::node::FullNode, Arc::strong_count(full) - 1);
-            }
-            Node::Short(short) => {
-                println!("Trie drop start, short node, addr: {:p}, ref count: {:?}, type: short", &**short as *const super::node::ShortNode, Arc::strong_count(short) - 1);
-            }
-            Node::Hash(hash) => {
-                println!("Trie drop start, hash node, addr: {:p}, type: hash", std::ptr::addr_of!(*hash));
-            }
-            Node::Value(value) => {
-                println!("Trie drop start, value node, addr: {:p}, type: value", std::ptr::addr_of!(*value));
-            }
-            Node::Empty => {
-                println!("Trie drop start, other node, addr: {:p}, type: empty", std::ptr::addr_of!(*self.root));
-            }
-        }
-
-        // 检测循环引用
-        self.detect_circular_references();
-        
-        if let Some(ref difflayer) = self.difflayer {
-            println!("Trie dropped, reference count to difflayer: {:?}", Arc::strong_count(difflayer) - 1);
-        } else {
-            println!("Trie dropped, reference count to difflayer: none");
-        }
-        println!("Trie drop end");
-    }
-}
-
 /// Basic Trie operations
 impl<DB> Trie<DB>
 where
@@ -86,17 +52,10 @@ where
             let root =Node::empty_root();
             root 
         } else {
-            println!("  Trie new =>  resolve_and_track");
             let root = tr.resolve_and_track(&id.state_root, &[])?;
             root
         };
-        if tr.root != Node::empty_root() {
-            println!("  Trie new, prepare to dorp old root, reference count: {:?}, addr: {:p}", Arc::strong_count(&tr.root) - 1, &*tr.root as *const super::node::Node);
-        }
         tr.root = root;
-        if tr.root != Node::empty_root() {
-            println!("  Trie new, hold new root, reference count: {:?}, addr: {:p}", Arc::strong_count(&tr.root), &*tr.root as *const super::node::Node);
-        }
         Ok(tr)
     }
 
@@ -118,21 +77,9 @@ where
             return EMPTY_ROOT_HASH;
         }
         let hasher = Hasher::new(self.unhashed > 100);
-        if self.root != Node::empty_root() {
-            println!("  Trie hash, before hasher, reference count: {:?}, addr: {:p}", Arc::strong_count(&self.root), &*self.root as *const super::node::Node);
-        }
         let(hashed, cached) = hasher.hash(self.root.clone(), true);
-        if self.root != Node::empty_root() {
-            println!("  Trie hash, after hasher, reference count: {:?}, addr: {:p}", Arc::strong_count(&self.root), &*self.root as *const super::node::Node);
-        }
         
-        if self.root != Node::empty_root() {
-            println!("  Trie hash, prepare to dorp old root, reference count: {:?}, addr: {:p}", Arc::strong_count(&self.root) - 1, &*self.root as *const super::node::Node);
-        }
         self.root = cached;
-        if self.root != Node::empty_root() {
-            println!("  Trie hash, hold new root, reference count: {:?}, addr: {:p}", Arc::strong_count(&self.root), &*self.root as *const super::node::Node);
-        }
         if let Node::Hash(h) = &*hashed {
             *h
         } else {
@@ -156,15 +103,11 @@ where
             return Ok((EMPTY_ROOT_HASH, Some(Arc::new(nodes))));
         }
 
-        println!("  Trie commit 000, before commit hash, reference count: {:?}, addr: {:p}", Arc::strong_count(&self.root), &*self.root as *const Node);
         let root_hash = self.hash();
-        println!("  Trie commit 000, after commit hash, reference count: {:?}, addr: {:p}", Arc::strong_count(&self.root), &*self.root as *const Node);
 
         let(hash_node, dirty) = self.root.cache();
         if !dirty {
-            println!("  Trie commit 1111, prepare to dorp old root, reference count: {:?}, addr: {:p}", Arc::strong_count(&self.root) - 1, &*self.root as *const Node);
             self.root = Arc::new(Node::Hash(hash_node.unwrap()));
-            println!("  Trie commit 1111, hold new root, reference count: {:?}, addr: {:p}", Arc::strong_count(&self.root), &*self.root as *const Node);
             self.committed = true;
             return Ok((root_hash, None));
         }
@@ -178,17 +121,11 @@ where
         }
 
         {
-            if self.root != Node::empty_root() {
-                println!("  Trie commit 2222, prepare to dorp old root, reference count: {:?}, addr: {:p}", Arc::strong_count(&self.root) - 1, &*self.root as *const super::node::Node);
-            }
             self.root = Committer::new(nodes.clone(), &self.tracer, collect_leaf)
                 .commit(
                     self.root.clone(), 
                     self.unhashed > 100
                 );
-            if self.root != Node::empty_root() {
-                println!("  Trie commit 2222, hold new root, reference count: {:?}, addr: {:p}", Arc::strong_count(&self.root), &*self.root as *const super::node::Node);
-            }
         }
 
         // Extract the final NodeSet for returning
@@ -198,8 +135,6 @@ where
         };
         self.uncommitted = 0;
         self.committed = true;
-
-        println!("trie commit internal, nodeset, strong count: {:?}", Arc::strong_count(&nodes));
 
         return Ok((root_hash, Some(nodeset)))
     }
@@ -231,13 +166,7 @@ where
 
         // Update root if it was resolved (CoW optimization)
         if did_resolve {
-            if self.root != Node::empty_root() {
-                println!("  Trie get, prepare to dorp old root, reference count: {:?}, addr: {:p}", Arc::strong_count(&self.root) - 1, &*self.root as *const super::node::Node);
-            }
             self.root = new_root;
-            if self.root != Node::empty_root() {
-                println!("  Trie get, hold new root, reference count: {:?}, addr: {:p}", Arc::strong_count(&self.root), &*self.root as *const super::node::Node);
-            }
         }
 
         // Return the found value (or None if not found)
@@ -274,13 +203,7 @@ where
                 nibbles_key)?;
 
             // Update the root with the new trie structure
-            if self.root != Node::empty_root() {
-                println!("  Trie update delete, prepare to dorp old root, reference count: {:?}, addr: {:p}", Arc::strong_count(&self.root) - 1, &*self.root as *const super::node::Node);
-            }
             self.root = new_root;
-            if self.root != Node::empty_root() {
-                println!("  Trie update delete, hold new root, reference count: {:?}, addr: {:p}", Arc::strong_count(&self.root), &*self.root as *const super::node::Node);
-            }
         } else {
             // Insert the new value into the trie
             let (_, new_root) = self.insert_internal(
@@ -291,13 +214,7 @@ where
             )?;
 
             // Update the root with the new trie structure
-            if self.root != Node::empty_root() {
-                println!("  Trie update insert, prepare to dorp old root, reference count: {:?}, addr: {:p}", Arc::strong_count(&self.root) - 1, &*self.root as *const super::node::Node);
-            }
             self.root = new_root;
-            if self.root != Node::empty_root() {
-                println!("  Trie update insert, hold new root, reference count: {:?}, addr: {:p}", Arc::strong_count(&self.root), &*self.root as *const super::node::Node);
-            }
         }
 
         Ok(())
@@ -325,13 +242,7 @@ where
         )?;
 
         // Update the root with the new trie structure
-        if self.root != Node::empty_root() {
-            println!("  Trie delete, prepare to dorp old root, reference count: {:?}, addr: {:p}", Arc::strong_count(&self.root) - 1, &*self.root as *const super::node::Node);
-        }
         self.root = new_root;
-        if self.root != Node::empty_root() {
-            println!("  Trie delete, hold new root, reference count: {:?}, addr: {:p}", Arc::strong_count(&self.root), &*self.root as *const super::node::Node);
-        }
         Ok(())
     }
 }
@@ -380,12 +291,9 @@ where
 
                 // If child was resolved, create a new short node with CoW
                 if resolved {
-                    println!("  get_internal Short, prepare to drop, reference count: {:?}, addr: {:p}", Arc::strong_count(&short), &**short as *const super::node::ShortNode);
                     let mut new_short = short.to_mutable_copy_with_cow();
                     new_short.set_value(&new_child);
-                    let new_node = Arc::new(Node::Short(Arc::new(new_short)));
-                    println!("  get_internal Short, new_node, addr: {:p}", &*new_node as *const super::node::Node);
-                    Ok((value, new_node, true))
+                    Ok((value, Arc::new(Node::Short(Arc::new(new_short))), true))
                 } else {
                     Ok((value, node, false))
                 }
@@ -403,12 +311,9 @@ where
 
                 // If child was resolved, create a new full node with CoW
                 if resolved {
-                    println!("  get_internal Full, prepare to drop, reference count: {:?}, addr: {:p}", Arc::strong_count(&full), &**full as *const super::node::FullNode);
                     let mut new_full = full.to_mutable_copy_with_cow();
                     new_full.set_child(nibble, &new_child);
-                    let new_node = Arc::new(Node::Full(Arc::new(new_full)));
-                    println!("  get_internal Full, new_node, addr: {:p}", &*new_node as *const super::node::Node);
-                    Ok((value, new_node, true))
+                    Ok((value, Arc::new(Node::Full(Arc::new(new_full))), true))
                 } else {
                     Ok((value, node, false))
                 }
@@ -416,7 +321,6 @@ where
 
             // Hash node - resolve and continue traversal
             Node::Hash(hash) => {
-                println!("  get_internal Hash, => resolve_and_track");
                 let resolved_node = self.resolve_and_track(
                     &hash,
                     &nibbles_key[..pos]
@@ -486,14 +390,12 @@ where
                             val: new_child,
                             flags: self.new_flag(),
                         };
-                        println!("  insert_internal Short 111111, new_node, addr: {:p}", &new_short as *const super::node::ShortNode);
                         return Ok((true, Arc::new(Node::Short(Arc::new(new_short)))));
                     }
                 }
 
                 // Create a branch node to split the short node
                 let mut branch = FullNode::new();
-                println!("  insert_internal new  branch, addr: {:p}", &branch as *const super::node::FullNode);
 
                 // Insert the short node's remaining key into the branch
                 let mut short_prefix = prefix.clone();
@@ -521,7 +423,6 @@ where
                 // If no common prefix, return the branch directly
                 if matchlen == 0 {
                     let node = Arc::new(Node::Full(Arc::new(branch)));
-                    println!("  insert_internal Short 222222, new_node, addr: {:p}", &*node as *const super::node::Node);
                     return Ok((true, node));
                 }
 
@@ -532,7 +433,6 @@ where
                     flags: self.new_flag(),
                 };
 
-                println!("  insert_internal Short 222222, new_node, addr: {:p}", &new_short as *const super::node::ShortNode);
                 // Trace the insert operation
                 let mut trace_path = prefix.clone();
                 trace_path.extend_from_slice(&nibbles_key[..matchlen]);
@@ -557,11 +457,9 @@ where
                 if !dirty {
                     return Ok((false, node));
                 } else {
-                    println!("  insert_internal Full, prepare to drop, reference count: {:?}, addr: {:p}", Arc::strong_count(&full), &**full as *const super::node::FullNode);
                     let mut new_full = full.to_mutable_copy_with_cow();
                     new_full.flags = self.new_flag();
                     new_full.set_child(nibbles_key[0] as usize, &new_child);
-                    println!("  insert_internal Full, new_node, addr: {:p}", &new_full as *const super::node::FullNode);
                     return Ok((true, Arc::new(Node::Full(Arc::new(new_full)))));
                 }
             }
@@ -573,13 +471,11 @@ where
                 self.tracer.on_insert(prefix.clone());
 
                 let new_short = ShortNode::new(nibbles_key, value.as_ref());
-                println!("  insert_internal EmptyRoot, new_node, addr: {:p}", &new_short as *const super::node::ShortNode);
                 return Ok((true, Arc::new(Node::Short(Arc::new(new_short)))));
             }
 
             // Hash node - resolve and continue insertion
             Node::Hash(hash) => {
-                println!("  insert_internal Hash, => resolve_and_track");
                 let resolved_node = self.resolve_and_track(hash, &prefix.to_vec())?;
                 let (dirty, new_node) = self.insert_internal(
                     Arc::clone(&resolved_node),
@@ -662,7 +558,6 @@ where
                             val: new_child_short.val.clone(),
                             flags: self.new_flag(),
                         };
-                        println!("  delete_internal Short, new_node, addr: {:p}", &new_short as *const super::node::ShortNode);
                         Ok((true, Arc::new(Node::Short(Arc::new(new_short)))))
                     }
                     _ => {
@@ -672,7 +567,6 @@ where
                             val: new_child,
                             flags: self.new_flag(),
                         };
-                        println!("  delete_internal other, new_node, addr: {:p}", &new_short as *const super::node::ShortNode);
                         Ok((true, Arc::new(Node::Short(Arc::new(new_short)))))
                     }
                 }
@@ -700,7 +594,6 @@ where
                 }
 
                 // Create modified copy with new child
-                println!("  delete_internal Full, prepare to drop, reference count: {:?}, addr: {:p}", Arc::strong_count(&full), &**full as *const super::node::FullNode);
                 let mut new_full = full.to_mutable_copy_with_cow();
                 new_full.flags = self.new_flag();
                 new_full.set_child(child_index, &new_child);
@@ -754,7 +647,6 @@ where
                                         val: child_short.val.clone(),
                                         flags: self.new_flag(),
                                     };
-                                    println!("  delete_internal Full Empty Short, new_node, addr: {:p}", &new_short as *const super::node::ShortNode);
                                     return Ok((true, Arc::new(Node::Short(Arc::new(new_short)))));
                                 }
                             }
@@ -765,9 +657,7 @@ where
                                 val: full_copy.get_child(non_empty_pos as usize),
                                 flags: self.new_flag(),
                             };
-                            let node = Arc::new(Node::Short(Arc::new(new_short)));
-                            println!("  delete_internal Full Empty, new_node, addr: {:p}", &*node as *const super::node::Node);
-                            Ok((true, node))
+                            Ok((true, Arc::new(Node::Short(Arc::new(new_short)))))
                         } else {
                             // Multiple children remain - keep as FullNode
                             Ok((true, Arc::new(Node::Full(Arc::new(full_copy)))))
@@ -776,7 +666,6 @@ where
                     _ => {
                         // Child is not empty - keep as FullNode
                         let node = Arc::new(Node::Full(Arc::new(full_copy)));
-                        println!("  delete_internal Full Empty, new_node, addr: {:p}", &*node as *const super::node::Node);
                         Ok((true, node))
                     }
                 }
@@ -794,7 +683,6 @@ where
 
             // Handle HashNode - resolve and recurse
             Node::Hash(hash) => {
-                println!("  delete_internal Hash, => resolve_and_track");
                 let resolved_node = self.resolve_and_track(hash, &prefix.to_vec())?;
                 let resolved_node_backup = Arc::clone(&resolved_node);
 
@@ -825,7 +713,6 @@ where
     fn resolve(&mut self, node: Arc<Node> , prefix: &[u8]) -> Result<Arc<Node>, SecureTrieError> {
         match &*node {
             Node::Hash(hash) => {
-                println!("resolve ==> resolve_and_track");
                 return self.resolve_and_track(hash, prefix);
             }
             _ => {
@@ -847,30 +734,7 @@ where
             if let Some(node) = difflayer.get(&key) {
                 self.tracer.on_read(prefix, node.blob.clone().unwrap());
                 let node= Node::must_decode_node(Some(*hash), &node.blob.clone().unwrap());
-                
-                match &*node {
-                    Node::Empty => {
-                        println!("  resolve_and_track difflayer, empty node");
-                        return Ok(node);
-                    }
-                    Node::Value(_) => {
-                        println!("  resolve_and_track difflayer, value node, addr: {:p}", &*node as *const super::node::Node);
-                        return Ok(node);
-                    }
-                    Node::Short(_) => {
-                        println!("  resolve_and_track difflayer, short node, addr: {:p}", &*node as *const super::node::Node);
-                        return Ok(node);
-                    }
-                    Node::Full(_) => {
-                        println!("  resolve_and_track difflayer, full node, addr: {:p}", &*node as *const super::node::Node);
-                        return Ok(node);
-                    }
-                    Node::Hash(_) => {
-                        println!("  resolve_and_track difflayer, hash node, addr: {:p}", &*node as *const super::node::Node);
-                        return Ok(node);
-                    }
-                }
-                // return Ok(node);
+                return Ok(node);
             }
         }
 
@@ -878,29 +742,7 @@ where
         if let Some(node_blob) = self.database.get(&key).map_err(|e| SecureTrieError::Database(format!("{:?}", e)))? {
             self.tracer.on_read(prefix, node_blob.clone());
             let node = Node::must_decode_node(Some(*hash), &node_blob);
-            match &*node {
-                Node::Empty => {
-                    println!("  resolve_and_track db, empty node");
-                    return Ok(node);
-                }
-                Node::Value(_) => {
-                    println!("  resolve_and_track db, value node, addr: {:p}", &*node as *const super::node::Node);
-                    return Ok(node);
-                }
-                Node::Short(_) => {
-                    println!("  resolve_and_track db, short node, addr: {:p}", &*node as *const super::node::Node);
-                    return Ok(node);
-                }
-                Node::Full(_) => {
-                    println!("  resolve_and_track db, full node, addr: {:p}", &*node as *const super::node::Node);
-                    return Ok(node);
-                }
-                Node::Hash(_) => {
-                    println!("  resolve_and_track db, hash node, addr: {:p}", &*node as *const super::node::Node);
-                    return Ok(node);
-                }
-            }
-            // return Ok(node);
+            return Ok(node);
         }
 
         return Err(SecureTrieError::Database(format!("Node not found in database: owner: {:?}, prefix: {:?}, key: {:?}", self.owner, prefix, key)));
@@ -977,66 +819,4 @@ where
             }
         }
     }
-}
-
-// General implementation without trait bounds
-impl<DB> Trie<DB> {
-    /// 检测循环引用
-    fn detect_circular_references(&self) {
-        println!("🔍 检测循环引用...");
-        
-        // 检查 empty_root 的引用计数
-        let empty_root = Node::empty_root();
-        let empty_count = Arc::strong_count(&empty_root);
-        println!("  EmptyRoot 全局引用计数: {}", empty_count);
-        
-        // 检查当前 root 的引用计数
-        let root_count = Arc::strong_count(&self.root);
-        println!("  当前 Root 引用计数: {}", root_count);
-        
-        // 如果引用计数 > 1，可能存在循环引用
-        if root_count > 1 {
-            println!("  ⚠️  检测到可能的循环引用！Root 引用计数: {}", root_count);
-            self.analyze_node_references(&self.root, 0, 10); // 最多递归3层
-        }
-    }
-    
-    /// 分析节点引用关系
-    fn analyze_node_references(&self, node: &Arc<Node>, depth: usize, max_depth: usize) {
-        if depth >= max_depth {
-            return;
-        }
-        
-        let indent = "  ".repeat(depth + 1);
-        let count = Arc::strong_count(node);
-        println!("{}节点引用计数: {}, 地址: {:p}", indent, count, &**node as *const Node);
-        
-        match &**node {
-            Node::Full(full) => {
-                println!("{}FullNode 子节点引用分析:", indent);
-                for (i, child) in full.children.iter().enumerate() {
-                    let child_count = Arc::strong_count(child);
-                    if child_count > 1 {
-                        println!("{}  子节点[{}] 引用计数: {}, 地址: {:p}", 
-                                indent, i, child_count, &**child as *const Node);
-                        if depth < max_depth - 1 {
-                            self.analyze_node_references(child, depth + 1, max_depth);
-                        }
-                    }
-                }
-            }
-            Node::Short(short) => {
-                let val_count = Arc::strong_count(&short.val);
-                if val_count > 1 {
-                    println!("{}ShortNode 值节点引用计数: {}, 地址: {:p}", 
-                            indent, val_count, &*short.val as *const Node);
-                    if depth < max_depth - 1 {
-                        self.analyze_node_references(&short.val, depth + 1, max_depth);
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
 }

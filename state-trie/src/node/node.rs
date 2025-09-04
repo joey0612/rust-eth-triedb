@@ -118,7 +118,6 @@ impl Node {
             17 => {
                 let full_node = FullNode::from_rlp(elements, hash)?;
                 let node = Arc::new(Node::Full(Arc::new(full_node)));
-                println!("  Node decode_node Full, node, addr: {:p}", &*node as *const super::node::Node);
                 Ok(node)
             }
             _ => {
@@ -153,26 +152,6 @@ impl Node {
             }
             // Invalid string length
             _ => Err(RlpError::Custom("invalid RLP string size, want 0 or 32 bytes")),
-        }
-    }
-}
-
-impl Drop for Node {
-    fn drop(&mut self) {
-        match self {
-            Node::Full(full) => {
-                println!("    Node::Full dropped, data address: {:p}, reference count to : {:?}", &**full as *const super::full_node::FullNode, Arc::strong_count(full) - 1);  
-            }
-            Node::Short(short) => {
-                println!("    Node::Short dropped, data address: {:p}, reference count to : {:?}", &**short as *const super::short_node::ShortNode, Arc::strong_count(short) - 1);
-            }
-            Node::Hash(_) => {
-                println!("    Node::Hash dropped, node address: {:p}", std::ptr::addr_of!(*self));
-            }
-            Node::Value(_) => {
-                println!("    Node::Value dropped, node address: {:p}", std::ptr::addr_of!(*self));
-            }
-            _ => {}
         }
     }
 }
