@@ -8,7 +8,7 @@ use std::sync::Arc;
 use alloy_rlp::{Decodable, Encodable, Header, Error as RlpError};
 use alloy_primitives::{keccak256, B256};
 use crate::node::rlp_raw::*;
-use crate::node::{HashNode, Node, NodeFlag};
+use crate::node::{HashNode, Node, NodeFlag, get_global_node_reference_manager};
 
 /// Full node with 17 children (16 hex digits + value)
 #[derive(Clone, Debug, PartialEq)]
@@ -17,6 +17,12 @@ pub struct FullNode {
     pub children: [Arc<Node>; 17],
     /// Node flags for caching and dirty state
     pub flags: NodeFlag,
+}
+
+impl Drop for FullNode {
+    fn drop(&mut self) {
+        get_global_node_reference_manager().drop_full_node(self);
+    }
 }
 
 impl FullNode {

@@ -177,12 +177,6 @@ impl Node {
     }
 }
 
-impl Drop for Node {
-    fn drop(&mut self) {
-        get_global_node_reference_manager().drop_node(self);
-    }
-}
-
 static NODE_REFERENCE_MANAGER: OnceLock<NodeReferenceManager> = OnceLock::new();
 
 /// Get the initialized global node reference manager instance.
@@ -197,8 +191,8 @@ pub struct NodeReferenceManager {
     alloc_full_count: Arc<Mutex<usize>>,
     alloc_short_count: Arc<Mutex<usize>>,
 
-    drop_more_full_count: Arc<Mutex<usize>>,
-    drop_more_short_count: Arc<Mutex<usize>>,
+    drop_full_count: Arc<Mutex<usize>>,
+    drop_short_count: Arc<Mutex<usize>>,
 }
 
 impl NodeReferenceManager {
@@ -208,31 +202,37 @@ impl NodeReferenceManager {
             alloc_short_nodes: Arc::new(Mutex::new(HashMap::new())),
             alloc_full_count: Arc::new(Mutex::new(0)),
             alloc_short_count: Arc::new(Mutex::new(0)),
-            drop_more_full_count: Arc::new(Mutex::new(0)),
-            drop_more_short_count: Arc::new(Mutex::new(0)),
+            drop_full_count: Arc::new(Mutex::new(0)),
+            drop_short_count: Arc::new(Mutex::new(0)),
         }
     }
 
-    pub fn add_arc_node(&self, node: &Arc<Node>, remark: String) {
-        match node.as_ref() {
+    // pub fn add_arc_node(&self, node: &Arc<Node>, remark: String) {
+    //     match node.as_ref() {
+    //         Node::Full(full) => {
+    //             let key = &**full as *const super::full_node::FullNode as usize;
+    //             self.alloc_full_nodes.lock().unwrap().insert(key, remark);
+    //             *self.alloc_full_count.lock().unwrap() += 1;
+    //         }
+    //         Node::Short(short) => {
+    //             let key = &**short as *const super::short_node::ShortNode as usize;
+    //             self.alloc_short_nodes.lock().unwrap().insert(key, remark);
+    //             *self.alloc_short_count.lock().unwrap() += 1;
+    //         }
+    //         _ => {}
+    //     }
+    // }
+
+    pub fn add_node(&self, node: &Node, remark: String) {
+        match node {
             Node::Full(full) => {
                 let key = &**full as *const super::full_node::FullNode as usize;
-                let mut map = self.alloc_full_nodes.lock().unwrap();
-                if map.contains_key(&key) {
-                    let old_remark = map.get(&key).unwrap();
-                    println!("  Warn!!!!! add_arc_node, full node already in alloc_full_nodes, key: {:?}, old_remark: {:?}, new_remark: {:?}", key, old_remark, remark);
-                }
-                map.insert(key, remark);
+                self.alloc_full_nodes.lock().unwrap().insert(key, remark);
                 *self.alloc_full_count.lock().unwrap() += 1;
             }
             Node::Short(short) => {
                 let key = &**short as *const super::short_node::ShortNode as usize;
-                let mut map = self.alloc_short_nodes.lock().unwrap();
-                if map.contains_key(&key) {
-                    let old_remark = map.get(&key).unwrap();
-                    println!("  Warn!!!!! add_arc_node, short node already in alloc_short_nodes, key: {:?}, old_remark: {:?}, new_remark: {:?}", key, old_remark, remark);
-                }
-                map.insert(key, remark);
+                self.alloc_short_nodes.lock().unwrap().insert(key, remark);
                 *self.alloc_short_count.lock().unwrap() += 1;
             }
             _ => {}
@@ -241,58 +241,80 @@ impl NodeReferenceManager {
 
     pub fn add_full_node(&self, full: &FullNode, remark: String) {
         let key = full as *const super::full_node::FullNode as usize;
-        let mut map = self.alloc_full_nodes.lock().unwrap();
-        if map.contains_key(&key) {
-            let old_remark = map.get(&key).unwrap();
-            println!("Warn!!!!! add_full_node, full node already in alloc_full_nodes, key: {:?}, old_remark: {:?}, new_remark: {:?}", key, old_remark, remark);
-        }
-        map.insert(key, remark);
+        self.alloc_full_nodes.lock().unwrap().insert(key, remark);
         *self.alloc_full_count.lock().unwrap() += 1;
     }
 
     pub fn add_short_node(&self, short: &ShortNode, remark: String) {
         let key = short as *const super::short_node::ShortNode as usize;
-        let mut map = self.alloc_short_nodes.lock().unwrap();
-        if map.contains_key(&key) {
-            let old_remark = map.get(&key).unwrap();
-            println!("Warn!!!!! add_short_node, short node already in alloc_short_nodes, key: {:?}, old_remark: {:?}, new_remark: {:?}", key, old_remark, remark);
-        }
-        map.insert(key, remark);
+        self.alloc_short_nodes.lock().unwrap().insert(key, remark);
         *self.alloc_short_count.lock().unwrap() += 1;
     }
     
-    pub fn drop_node(&self, node: &Node) {
-        match node {
-            Node::Full(full) => {
-                if Arc::strong_count(full) - 1 == 0 {
-                    let key = &**full as *const super::full_node::FullNode as usize;
-                    if self.alloc_full_nodes.lock().unwrap().remove(&key).is_none() {
-                        *self.drop_more_full_count.lock().unwrap() += 1;
-                    }
-                }
-            }
-            Node::Short(short) => {
-                if Arc::strong_count(short) - 1 == 0 {
-                    let key = &**short as *const super::short_node::ShortNode as usize;
-                    if self.alloc_short_nodes.lock().unwrap().remove(&key).is_none() {
-                        *self.drop_more_short_count.lock().unwrap() += 1;
-                    }
-                }
-            }
-            _ => {}
-        }
+    pub fn drop_short_node(&self, short: &ShortNode) {
+        let key = short as *const super::short_node::ShortNode as usize;
+        self.alloc_short_nodes.lock().unwrap().remove(&key);
+        *self.drop_short_count.lock().unwrap() += 1;
     }
 
+    pub fn drop_full_node(&self, full: &FullNode) {
+        let key = full as *const super::full_node::FullNode as usize;
+        self.alloc_full_nodes.lock().unwrap().remove(&key);
+        *self.drop_full_count.lock().unwrap() += 1;
+    }
+    
+
+    // pub fn drop_node(&self, node: &Node) {
+    //     match node {
+    //         Node::Full(full) => {
+    //             if Arc::strong_count(full) - 1 == 0 {
+    //                 let key = &**full as *const super::full_node::FullNode as usize;
+    //                 if self.alloc_full_nodes.lock().unwrap().remove(&key).is_none() {
+    //                     *self.drop_more_full_count.lock().unwrap() += 1;
+    //                 }
+    //             }
+    //         }
+    //         Node::Short(short) => {
+    //             if Arc::strong_count(short) - 1 == 0 {
+    //                 let key = &**short as *const super::short_node::ShortNode as usize;
+    //                 if self.alloc_short_nodes.lock().unwrap().remove(&key).is_none() {
+    //                     *self.drop_more_short_count.lock().unwrap() += 1;
+    //                 }
+    //             }
+    //         }
+    //         _ => {}
+    //     }
+    // }
+
     pub fn debug_print(&self) {
-        println!("NodeReferenceManager debug_print, alloc_full_nodes_reserved: {:?}, alloc_short_nodes_reserved: {:?}, alloc_full_count: {:?}, alloc_short_count: {:?}, drop_more_full_count: {:?}, drop_more_short_count: {:?}", 
-        self.alloc_full_nodes.lock().unwrap().len(), self.alloc_short_nodes.lock().unwrap().len(), self.alloc_full_count.lock().unwrap(), self.alloc_short_count.lock().unwrap(), self.drop_more_full_count.lock().unwrap(), self.drop_more_short_count.lock().unwrap());
-        
-        if !self.alloc_full_nodes.lock().unwrap().is_empty() {
-            println!("alloc_full_nodes, no drop: {:?}", self.alloc_full_nodes.lock().unwrap());
+        println!("NodeReferenceManager debug_print");
+        println!("
+                  alloc_full_nodes_reserved: {:?}, 
+                  alloc_short_nodes_reserved: {:?}, 
+                  alloc_full_count: {:?}, 
+                  alloc_short_count: {:?}, 
+                  drop_full_count: {:?}, 
+                  drop_short_count: {:?}
+                  ", 
+                self.alloc_full_nodes.lock().unwrap().len(), 
+                self.alloc_short_nodes.lock().unwrap().len(), 
+                self.alloc_full_count.lock().unwrap(), 
+                self.alloc_short_count.lock().unwrap(), 
+                self.drop_full_count.lock().unwrap(), 
+                self.drop_short_count.lock().unwrap());
+        for (key, remark) in self.alloc_full_nodes.lock().unwrap().iter() {
+            println!("alloc_full_nodes, key: {:?}, remark: {:?}", key, remark);
         }
-        if !self.alloc_short_nodes.lock().unwrap().is_empty() {
-            println!("alloc_short_nodes, no drop: {:?}", self.alloc_short_nodes.lock().unwrap());
+        for (key, remark) in self.alloc_short_nodes.lock().unwrap().iter() {
+            println!("alloc_short_nodes, key: {:?}, remark: {:?}", key, remark);
         }
+
+        // if !self.alloc_full_nodes.lock().unwrap().is_empty() {
+        //     println!("alloc_full_nodes, no drop: {:?}", self.alloc_full_nodes.lock().unwrap());
+        // }
+        // if !self.alloc_short_nodes.lock().unwrap().is_empty() {
+        //     println!("alloc_short_nodes, no drop: {:?}", self.alloc_short_nodes.lock().unwrap());
+        // }
         println!("NodeReferenceManager debug_print, done");
     }
 }
@@ -401,6 +423,7 @@ mod tests {
 
     #[test]
     fn shortnode_with_fullnode_value_with_1byte_in_17th_child() {
+        init_empty_root_node();
         // Inner full node with 17th (index 16) child = 1-byte value
         let mut inner_full = FullNode::new();
         inner_full.set_child(16, &Node::Value(vec![0x02]));

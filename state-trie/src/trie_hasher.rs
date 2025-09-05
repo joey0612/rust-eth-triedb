@@ -3,7 +3,7 @@
 //! This module provides a hasher for computing trie hashes.
 use std::sync::Arc;
 use alloy_primitives::{keccak256};
-use crate::node::{Node, ShortNode, FullNode};
+use crate::node::{Node, ShortNode, FullNode, get_global_node_reference_manager};
 use crate::encoding::hex_to_compact;
 use rayon::prelude::*;
 
@@ -47,6 +47,10 @@ impl Hasher {
                         cached.flags.hash = None;
                     }
                 }
+
+                get_global_node_reference_manager().add_short_node(&cached, "Hasher short, short".to_string());
+                get_global_node_reference_manager().add_node(&hashed, "Hasher short, hashed".to_string());
+                
                 (Arc::new(hashed), Arc::new(Node::Short(Arc::new(cached))))
             }
             Node::Full(full) => {
@@ -64,8 +68,10 @@ impl Hasher {
                     }
                 }
 
-                let node = Arc::new(Node::Full(Arc::new(cached)));
-                (Arc::new(hashed), node)
+                get_global_node_reference_manager().add_full_node(&cached, "Hasher full, full".to_string());
+                get_global_node_reference_manager().add_node(&hashed, "Hasher full, hashed".to_string());
+
+                (Arc::new(hashed), Arc::new(Node::Full(Arc::new(cached))))
             }
             _ => {
                 (node.clone(), node)

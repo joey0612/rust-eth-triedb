@@ -8,7 +8,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use crate::node::{Node, FullNode, NodeSet, TrieNode};
+use crate::node::{Node, FullNode, NodeSet, TrieNode, get_global_node_reference_manager};
 use crate::trie_tracer::TrieTracer;
 use crate::encoding::hex_to_compact;
 
@@ -68,14 +68,17 @@ impl<'a> Committer<'a> {
                 }
 
                 collapsed.key = hex_to_compact(short.key.as_slice());
-                let new_collapsed = Arc::new(Node::Short(Arc::new(collapsed.clone())));
+
                 let hn = self.store(
                     path.clone(), 
-                    new_collapsed.clone());
+                    Arc::new(Node::Short(Arc::new(collapsed.clone()))));
 
                 if let Node::Hash(hash) = hn.as_ref() {
                     return Arc::new(Node::Hash(*hash));
                 }
+
+                get_global_node_reference_manager().add_short_node(&collapsed, "Committer short, short".to_string());
+
                 return Arc::new(Node::Short(Arc::new(collapsed)));
             }
             Node::Full(full) => {
@@ -87,16 +90,17 @@ impl<'a> Committer<'a> {
                 let mut collapsed = full.to_mutable_copy_with_cow();
                 collapsed.children = hashed_children;
 
-                let new_collapsed = Arc::new(Node::Full(Arc::new(collapsed.clone())));
                 let hn = self.store(
                     path.clone(), 
-                    new_collapsed.clone());
+                    Arc::new(Node::Full(Arc::new(collapsed.clone()))));
 
                 if let Node::Hash(hash) = hn.as_ref() {
                     return Arc::new(Node::Hash(*hash));
                 }
-                let node = Arc::new(Node::Full(Arc::new(collapsed)));
-                return node;
+
+                get_global_node_reference_manager().add_full_node(&collapsed, "Committer full, full".to_string());
+
+                return Arc::new(Node::Full(Arc::new(collapsed)))
             }
             Node::Hash(_) => {
                 return node;

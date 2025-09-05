@@ -9,6 +9,9 @@ pub mod triedb_manager;
 #[cfg(test)]
 mod triedb_test;
 
+#[cfg(test)]
+mod triedb_simple_test;
+
 // Re-export main types
 pub use triedb::TrieDB;
 pub use triedb::TrieDBError;
