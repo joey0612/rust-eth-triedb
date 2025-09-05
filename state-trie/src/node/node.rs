@@ -372,12 +372,32 @@ impl NodeReferenceManager {
                   alloc_full_nodes_reserved: {:?}, 
                   alloc_short_nodes_reserved: {:?}, 
                   alloc_hash_nodes_reserved: {:?}, 
-                  alloc_value_nodes_reserved: {:?}, 
+                  alloc_value_nodes_reserved: {:?},
+
+                  alloc_full_count: {:?},
+                  alloc_short_count: {:?},
+                  alloc_hash_count: {:?},
+                  alloc_value_count: {:?},
+
+                  drop_full_count: {:?},
+                  drop_short_count: {:?},
+                  drop_hash_count: {:?},
+                  drop_value_count: {:?},
                   ", 
                 self.alloc_full_nodes.lock().unwrap().len(), 
                 self.alloc_short_nodes.lock().unwrap().len(),
                 self.alloc_hash_nodes.lock().unwrap().len(),
-                self.alloc_value_nodes.lock().unwrap().len());
+                self.alloc_value_nodes.lock().unwrap().len(),
+
+                *self.alloc_full_count.lock().unwrap(),
+                *self.alloc_short_count.lock().unwrap(),
+                *self.alloc_hash_count.lock().unwrap(),
+                *self.alloc_value_count.lock().unwrap(),
+                
+                *self.drop_full_count.lock().unwrap(),
+                *self.drop_short_count.lock().unwrap(),
+                *self.drop_hash_count.lock().unwrap(),
+                *self.drop_value_count.lock().unwrap());
 
         for (key, value) in self.alloc_full_nodes.lock().unwrap().iter() {
             println!("alloc_full_nodes: {:?}, {:?}", key, value);
