@@ -35,7 +35,10 @@ rocksdb = "0.24"
 tracing = "0.1"
 schnellru = "0.2"
 tempfile = "3.8"
-tikv-jemallocator = "0.6"
+# tikv-jemallocator = "0.6"  # Commented out for standard jemalloc migration
+jemallocator = { version = "0.5", features = ["profiling"] }
+jemalloc-sys = "0.5"
+jemalloc-ctl = "0.5"
 rust-eth-triedb-common = { version = "0.1.0", path = "common" }
 rust-eth-triedb-memorydb = { version = "0.1.0", path = "db/memorydb" }
 rust-eth-triedb-pathdb = { version = "0.1.0", path = "db/pathdb" }
@@ -50,8 +53,10 @@ metrics = "0.24.0"
 metrics-derive = "0.1"
 
 [workspace.features]
-jemalloc = ["tikv-jemallocator"]
-jemalloc-prof = ["tikv-jemallocator?/profiling"] 
+# jemalloc = ["tikv-jemallocator"]  # Commented out for standard jemalloc migration
+# jemalloc-prof = ["tikv-jemallocator?/profiling"]  # Commented out for standard jemalloc migration
+jemalloc = ["jemallocator"]
+jemalloc-prof = ["jemalloc", "jemalloc-sys?/profiling", "jemalloc-ctl?/stats"] 
 
 [profile.release]
 opt-level = 3

@@ -23,13 +23,19 @@ tracing.workspace = true
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tempfile.workspace = true
 hex.workspace = true
-tikv-jemallocator = { workspace = true, optional = true }
+# tikv-jemallocator = { workspace = true, optional = true }  # Commented out for standard jemalloc migration
+jemallocator = { workspace = true, optional = true, features = ["profiling"] }
+jemalloc-sys = { workspace = true, optional = true }
+jemalloc-ctl = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile.workspace = true
 
 [features]
-jemalloc = ["tikv-jemallocator"]
+# jemalloc = ["tikv-jemallocator"]  # Commented out for standard jemalloc migration
+# jemalloc-prof = ["tikv-jemallocator?/profiling"]  # Commented out for standard jemalloc migration
+jemalloc = ["jemallocator"]
+jemalloc-prof = ["jemalloc", "jemalloc-sys?/profiling", "jemalloc-ctl?/stats"]
 
 [profile.maxperf]
 inherits = "release"

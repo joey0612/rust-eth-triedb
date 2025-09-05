@@ -10,8 +10,10 @@ description = "Trie database implementation for Ethereum state management"
 
 [features]
 default = []
-jemalloc = ["tikv-jemallocator"]
-jemalloc-prof = ["tikv-jemallocator?/profiling"]
+# jemalloc = ["tikv-jemallocator"]  # Commented out for standard jemalloc migration
+# jemalloc-prof = ["tikv-jemallocator?/profiling"]  # Commented out for standard jemalloc migration
+jemalloc = ["jemallocator"]
+jemalloc-prof = ["jemalloc", "jemalloc-sys?/profiling", "jemalloc-ctl?/stats"]
 
 [dependencies]
 # Local dependencies
@@ -37,7 +39,10 @@ rayon.workspace = true
 once_cell = "1.19"
 
 # Jemalloc support
-tikv-jemallocator = { workspace = true, optional = true }
+# tikv-jemallocator = { workspace = true, optional = true }  # Commented out for standard jemalloc migration
+jemallocator = { workspace = true, optional = true, features = ["profiling"] }
+jemalloc-sys = { workspace = true, optional = true }
+jemalloc-ctl = { workspace = true, optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["full"] }

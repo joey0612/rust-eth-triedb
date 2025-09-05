@@ -13,8 +13,10 @@ workspace = true
 
 [features]
 default = []
-jemalloc = ["tikv-jemallocator"]
-jemalloc-prof = ["tikv-jemallocator?/profiling"]
+# jemalloc = ["tikv-jemallocator"]  # Commented out for standard jemalloc migration
+# jemalloc-prof = ["tikv-jemallocator?/profiling"]  # Commented out for standard jemalloc migration
+jemalloc = ["jemallocator"]
+jemalloc-prof = ["jemalloc", "jemalloc-sys?/profiling", "jemalloc-ctl?/stats"]
 
 [dependencies]
 # alloy
@@ -25,7 +27,10 @@ auto_impl.workspace = true
 thiserror.workspace = true
 
 # Jemalloc support
-tikv-jemallocator = { workspace = true, optional = true }
+# tikv-jemallocator = { workspace = true, optional = true }  # Commented out for standard jemalloc migration
+jemallocator = { workspace = true, optional = true, features = ["profiling"] }
+jemalloc-sys = { workspace = true, optional = true }
+jemalloc-ctl = { workspace = true, optional = true }
 
 [profile.maxperf]
 inherits = "release"
