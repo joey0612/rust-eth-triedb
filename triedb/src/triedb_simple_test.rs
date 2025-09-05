@@ -28,7 +28,7 @@ fn test_multiple_accounts_update() {
     let db = PathDB::new(db_path, config).expect("Failed to create PathDB");
     let mut triedb = TrieDB::new(db);
 
-    let total_operations = 1;
+    let total_operations = 10000;
 
     let mut states = HashMap::new();
     let states_rebuild = std::collections::HashSet::new();
@@ -43,13 +43,28 @@ fn test_multiple_accounts_update() {
         states.insert(hashed_address, Some(account));
     }
     // Update and commit
-    let result = triedb.update_and_commit(
+    let (root_hash, merged_node_set) = triedb.update_and_commit(
         B256::ZERO,
         None,
         states,
         states_rebuild,
         storage_states,
-    );
+    ).unwrap();
 
-    println!("Result: {:?}", result.unwrap().0);
+    if let Some(merged_node_set) = merged_node_set {
+        let difflayer = merged_node_set.to_difflayer();
+        triedb.flush(0, root_hash, &Some(difflayer)).unwrap();
+    }
+
+    triedb.state_at(root_hash, None).unwrap();
+
+    for i in 0..total_operations {
+        let hashed_address = keccak256((i as u64).to_le_bytes());
+        triedb.get_account_with_hash_state(hashed_address).unwrap().unwrap();
+    }
+    triedb.clean();
+
+    println!("Result: {:?}", root_hash);
+
+    
 }

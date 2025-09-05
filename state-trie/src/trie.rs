@@ -160,7 +160,7 @@ where
 
         // Get value from internal trie structure
         let (value, new_root, did_resolve) = self.get_internal(
-            Arc::clone(&self.root),
+            self.root.clone(),
             nibbles_key,
             0
         )?;
@@ -285,7 +285,7 @@ where
 
                 // Recursively get from the child node
                 let (value, new_child, resolved) = self.get_internal(
-                    Arc::clone(&short.val),
+                    short.val.clone(),
                     nibbles_key,
                     pos + short.key.len()
                 )?;
@@ -295,9 +295,10 @@ where
                     let mut new_short = short.to_mutable_copy_with_cow();
                     new_short.set_value(&new_child);
 
-                    get_global_node_reference_manager().add_short_node(&new_short, "Get internal short, short".to_string());
+                    let new_short_arc = Arc::new(Node::Short(Arc::new(new_short)));
+                    get_global_node_reference_manager().add_arc_node(&new_short_arc, "get_internal short, resolved".to_string());
 
-                    Ok((value, Arc::new(Node::Short(Arc::new(new_short))), true))
+                    Ok((value, new_short_arc, true))
                 } else {
                     Ok((value, node, false))
                 }
@@ -318,9 +319,10 @@ where
                     let mut new_full = full.to_mutable_copy_with_cow();
                     new_full.set_child(nibble, &new_child);
 
-                    get_global_node_reference_manager().add_full_node(&new_full, "Get internal full, full".to_string());
+                    let new_full_acr = Arc::new(Node::Full(Arc::new(new_full)));
+                    get_global_node_reference_manager().add_arc_node(&new_full_acr, "get_internal full, resolved".to_string());
 
-                    Ok((value, Arc::new(Node::Full(Arc::new(new_full))), true))
+                    Ok((value, new_full_acr, true))
                 } else {
                     Ok((value, node, false))
                 }
@@ -392,15 +394,20 @@ where
                     if !dirty {
                         return Ok((false, node));
                     } else {
-                        let new_short = ShortNode {
+                        // let new_short = ShortNode {
+                        //     key: short.key.clone(),
+                        //     val: new_child,
+                        //     flags: self.new_flag(),
+                        // };
+
+                        let new_short_arc = Arc::new(Node::Short(Arc::new(ShortNode {
                             key: short.key.clone(),
                             val: new_child,
                             flags: self.new_flag(),
-                        };
+                        })));
+                        get_global_node_reference_manager().add_arc_node(&new_short_arc, "insert_internal short, dirty".to_string());
 
-                        get_global_node_reference_manager().add_short_node(&new_short, "Insert internal short, short".to_string());
-
-                        return Ok((true, Arc::new(Node::Short(Arc::new(new_short)))));
+                        return Ok((true, new_short_arc));
                     }
                 }
 
@@ -415,7 +422,7 @@ where
                     Node::empty_root(),
                     short_prefix,
                     short.key[matchlen + 1..].to_vec(),
-                    Arc::clone(&short.val)
+                    short.val.clone()
                 )?;
                 branch.set_child(short.key[matchlen] as usize, new_child1.as_ref());
 
@@ -433,26 +440,34 @@ where
                 // If no common prefix, return the branch directly
                 if matchlen == 0 {
 
-                    get_global_node_reference_manager().add_full_node(&branch, "Insert internal short, full".to_string());
+                    let new_full_arc = Arc::new(Node::Full(Arc::new(branch)));
+                    
+                    get_global_node_reference_manager().add_arc_node(&new_full_arc, "insert_internal short full, matchlen == 0".to_string());
 
-                    return Ok((true, Arc::new(Node::Full(Arc::new(branch)))));
+                    return Ok((true, new_full_arc));
                 }
 
                 // Create a new short node with the common prefix
-                let new_short = ShortNode {
+                // let new_short = ShortNode {
+                //     key: nibbles_key[..matchlen].to_vec(),
+                //     val: Arc::new(Node::Full(Arc::new(branch))),
+                //     flags: self.new_flag(),
+                // };
+
+                let new_short_arc = Arc::new(Node::Short(Arc::new(ShortNode {
                     key: nibbles_key[..matchlen].to_vec(),
                     val: Arc::new(Node::Full(Arc::new(branch))),
                     flags: self.new_flag(),
-                };
+                })));
 
                 // Trace the insert operation
                 let mut trace_path = prefix.clone();
                 trace_path.extend_from_slice(&nibbles_key[..matchlen]);
                 self.tracer.on_insert(trace_path);
 
-                get_global_node_reference_manager().add_short_node(&new_short, "Insert internal short, short 2".to_string());
+                get_global_node_reference_manager().add_arc_node(&new_short_arc, "insert_internal short short".to_string());
 
-                return Ok((true, Arc::new(Node::Short(Arc::new(new_short)))));
+                return Ok((true, new_short_arc));
             }
 
             // Full node - traverse to appropriate child
@@ -475,9 +490,10 @@ where
                     new_full.flags = self.new_flag();
                     new_full.set_child(nibbles_key[0] as usize, &new_child);
 
-                    get_global_node_reference_manager().add_full_node(&new_full, "Insert internal full, full".to_string());
+                    let new_full_arc = Arc::new(Node::Full(Arc::new(new_full)));
+                    get_global_node_reference_manager().add_arc_node(&new_full_arc, "insert_internal full, dirty".to_string());
 
-                    return Ok((true, Arc::new(Node::Full(Arc::new(new_full)))));
+                    return Ok((true, new_full_arc));
                 }
             }
 
@@ -487,28 +503,18 @@ where
                 // Trace the insert operation
                 self.tracer.on_insert(prefix.clone());
 
-                let new_short = ShortNode::new(nibbles_key, value.as_ref());
-                
-                // let key2 = &new_short as *const super::node::short_node::ShortNode as usize;
-                // println!("111111 Insert internal empty, short, node: {:?}", key2);
+                let short_arc = Arc::new(Node::Short(Arc::new(ShortNode::new(nibbles_key, value.as_ref()))));
 
-                // get_global_node_reference_manager().add_short_node(&new_short, "Insert internal empty, short".to_string());
+                get_global_node_reference_manager().add_arc_node(&short_arc, "insert_internal empty short".to_string());
 
-                // let node = Arc::new(Node::Short(Arc::new(new_short)));
-
-                // if let Node::Short(short_arc) = &*node {
-                //     let key1 = short_arc.as_ref() as *const super::node::short_node::ShortNode as usize;
-                //     println!("22222 Insert internal empty, short, node: {:?}", key1);
-                // }
-
-                return Ok((true, Arc::new(Node::Short(Arc::new(new_short)))));
+                return Ok((true, short_arc));
             }
 
             // Hash node - resolve and continue insertion
             Node::Hash(hash) => {
                 let resolved_node = self.resolve_and_track(hash, &prefix.to_vec())?;
                 let (dirty, new_node) = self.insert_internal(
-                    Arc::clone(&resolved_node),
+                    resolved_node.clone(),
                     prefix,
                     nibbles_key,
                     value
@@ -546,7 +552,7 @@ where
 
                 // Key doesn't match this short node - no deletion needed
                 if matchlen < short.key.len() {
-                    return Ok((false, Arc::clone(&node)));
+                    return Ok((false, node.clone()));
                 }
 
                 // Complete key match - delete this node by returning EmptyRoot
@@ -568,7 +574,7 @@ where
 
                 // Child wasn't modified - return unchanged node
                 if !dirty {
-                    return Ok((false, Arc::clone(&node)));
+                    return Ok((false, node.clone()));
                 }
 
                 // Child was modified - handle the result
@@ -583,27 +589,36 @@ where
                         let mut merged_key = short.key.clone();
                         merged_key.extend(&new_child_short.key);
 
-                        let new_short = ShortNode {
+                        // let new_short = ShortNode {
+                        //     key: merged_key,
+                        //     val: new_child_short.val.clone(),
+                        //     flags: self.new_flag(),
+                        // };
+                        let new_short_arc = Arc::new(Node::Short(Arc::new(ShortNode {
                             key: merged_key,
                             val: new_child_short.val.clone(),
                             flags: self.new_flag(),
-                        };
+                        })));
+                        get_global_node_reference_manager().add_arc_node(&new_short_arc, "delete_internal short".to_string());
 
-                        get_global_node_reference_manager().add_short_node(&new_short, "Delete internal short, short".to_string());
-
-                        Ok((true, Arc::new(Node::Short(Arc::new(new_short)))))
+                        Ok((true, new_short_arc))
                     }
                     _ => {
                         // Keep current key, update child
-                        let new_short = ShortNode {
+                        // let new_short = ShortNode {
+                        //     key: short.key.clone(),
+                        //     val: new_child,
+                        //     flags: self.new_flag(),
+                        // };
+                        let new_short_arc = Arc::new(Node::Short(Arc::new(ShortNode {
                             key: short.key.clone(),
                             val: new_child,
                             flags: self.new_flag(),
-                        };
+                        })));
 
-                        get_global_node_reference_manager().add_short_node(&new_short, "Delete internal short, short 2".to_string());
+                        get_global_node_reference_manager().add_arc_node(&new_short_arc, "delete_internal short, short".to_string());
 
-                        Ok((true, Arc::new(Node::Short(Arc::new(new_short)))))
+                        Ok((true, new_short_arc))
                     }
                 }
             }
@@ -626,7 +641,7 @@ where
 
                 // Child wasn't modified - return unchanged node
                 if !dirty {
-                    return Ok((false, Arc::clone(&node)));
+                    return Ok((false, node.clone()));
                 }
 
                 // Create modified copy with new child
@@ -678,39 +693,54 @@ where
                                     let mut merged_key = vec![non_empty_pos as u8];
                                     merged_key.extend(&child_short.key);
 
-                                    let new_short = ShortNode {
+                                    // let new_short = ShortNode {
+                                    //     key: merged_key,
+                                    //     val: child_short.val.clone(),
+                                    //     flags: self.new_flag(),
+                                    // };
+
+                                    let new_short_arc = Arc::new(Node::Short(Arc::new(ShortNode {
                                         key: merged_key,
                                         val: child_short.val.clone(),
                                         flags: self.new_flag(),
-                                    };
+                                    })));
 
-                                    get_global_node_reference_manager().add_short_node(&new_short, "Delete internal short, short 3".to_string());
+                                    get_global_node_reference_manager().add_arc_node(&new_short_arc, "delete_internal short, short short".to_string());
 
-                                    return Ok((true, Arc::new(Node::Short(Arc::new(new_short)))));
+                                    return Ok((true, new_short_arc));
                                 }
                             }
 
                             // Create ShortNode with single child
-                            let new_short = ShortNode {
+                            // let new_short = ShortNode {
+                            //     key: pos_nibbles,
+                            //     val: full_copy.get_child(non_empty_pos as usize),
+                            //     flags: self.new_flag(),
+                            // };
+
+                            let new_short_arc =Arc::new(Node::Short(Arc::new(ShortNode {
                                 key: pos_nibbles,
                                 val: full_copy.get_child(non_empty_pos as usize),
                                 flags: self.new_flag(),
-                            };
+                            })));
 
-                            get_global_node_reference_manager().add_short_node(&new_short, "Delete internal short, short 4".to_string());
+                            get_global_node_reference_manager().add_arc_node(&new_short_arc, "delete_internal short, short 4".to_string());
 
-                            Ok((true, Arc::new(Node::Short(Arc::new(new_short)))))
+                            Ok((true, new_short_arc))
                         } else {
                             // Multiple children remain - keep as FullNode
-                            Ok((true, Arc::new(Node::Full(Arc::new(full_copy)))))
+                            let new_full_arc = Arc::new(Node::Full(Arc::new(full_copy)));
+                            get_global_node_reference_manager().add_arc_node(&new_full_arc, "delete_internal full, full".to_string());
+                            Ok((true, new_full_arc))
                         }
                     }
                     _ => {
                         // Child is not empty - keep as FullNode
 
-                        get_global_node_reference_manager().add_full_node(&full_copy, "Delete internal other, full".to_string());
+                        let new_full_arc = Arc::new(Node::Full(Arc::new(full_copy)));
+                        get_global_node_reference_manager().add_arc_node(&new_full_arc, "delete_internal other".to_string());
 
-                        Ok((true, Arc::new(Node::Full(Arc::new(full_copy)))))
+                        Ok((true, new_full_arc))
                     }
                 }
             }
@@ -728,7 +758,7 @@ where
             // Handle HashNode - resolve and recurse
             Node::Hash(hash) => {
                 let resolved_node = self.resolve_and_track(hash, &prefix.to_vec())?;
-                let resolved_node_backup = Arc::clone(&resolved_node);
+                let resolved_node_backup = resolved_node.clone();
 
                 let (dirty, new_node) = self.delete_internal(
                     resolved_node,
@@ -779,7 +809,7 @@ where
                 self.tracer.on_read(prefix, node.blob.clone().unwrap());
                 let node= Node::must_decode_node(Some(*hash), &node.blob.clone().unwrap());
                 
-                get_global_node_reference_manager().add_node(&node, "Resolve and track difflayer, node".to_string());
+                get_global_node_reference_manager().add_arc_node(&node, "resolve_and_track difflayer, node".to_string());
                 
                 return Ok(node);
             }
@@ -790,7 +820,7 @@ where
             self.tracer.on_read(prefix, node_blob.clone());
             let node = Node::must_decode_node(Some(*hash), &node_blob);
             
-            get_global_node_reference_manager().add_node(&node, "Resolve and track database, node".to_string());
+            get_global_node_reference_manager().add_arc_node(&node, "resolve_and_track database, node".to_string());
 
             return Ok(node);
         }

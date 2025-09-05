@@ -50,7 +50,9 @@ impl<'a> Committer<'a> {
         let (hash_opt, dirty) = node.cache();
         if let (Some(hash), false) = (hash_opt, dirty) {
             // Node already has a cached hash and is not dirty → return hash node directly
-            return Arc::new(Node::Hash(hash));
+            let committed_node = Arc::new(Node::Hash(hash));
+            get_global_node_reference_manager().add_arc_node(&committed_node, "commit_internal cached hash, hash".to_string());
+            return committed_node;
         }
 
         match node.as_ref() {
@@ -74,12 +76,15 @@ impl<'a> Committer<'a> {
                     Arc::new(Node::Short(Arc::new(collapsed.clone()))));
 
                 if let Node::Hash(hash) = hn.as_ref() {
-                    return Arc::new(Node::Hash(*hash));
+                    let committed_node = Arc::new(Node::Hash(*hash));
+                    get_global_node_reference_manager().add_arc_node(&committed_node, "commit_internal short committed, hash".to_string());
+                    return committed_node;
                 }
 
-                get_global_node_reference_manager().add_short_node(&collapsed, "Committer short, short".to_string());
+                let committed_node = Arc::new(Node::Short(Arc::new(collapsed)));
+                get_global_node_reference_manager().add_arc_node(&committed_node, "commit_internal short committed, short".to_string());
 
-                return Arc::new(Node::Short(Arc::new(collapsed)));
+                return committed_node;
             }
             Node::Full(full) => {
                 let hashed_children = self.commit_children(
@@ -95,12 +100,15 @@ impl<'a> Committer<'a> {
                     Arc::new(Node::Full(Arc::new(collapsed.clone()))));
 
                 if let Node::Hash(hash) = hn.as_ref() {
-                    return Arc::new(Node::Hash(*hash));
+                    let committed_node = Arc::new(Node::Hash(*hash));
+                    get_global_node_reference_manager().add_arc_node(&committed_node, "commit_internal full committed, hash".to_string());
+                    return committed_node;
                 }
 
-                get_global_node_reference_manager().add_full_node(&collapsed, "Committer full, full".to_string());
+                let committed_node = Arc::new(Node::Full(Arc::new(collapsed)));
+                get_global_node_reference_manager().add_arc_node(&committed_node, "commit_internal full committed, full".to_string());
 
-                return Arc::new(Node::Full(Arc::new(collapsed)))
+                return committed_node
             }
             Node::Hash(_) => {
                 return node;
@@ -190,6 +198,12 @@ impl<'a> Committer<'a> {
             children[16] = full.children[16].clone();
         }
 
+        for i in 0..17 {
+            if let Node::Empty = full.children[i].as_ref() {
+                continue;
+            }
+            get_global_node_reference_manager().add_arc_node(&children[i], "commit_children committed, child".to_string());
+        }
         children
     }
 
@@ -209,7 +223,8 @@ impl<'a> Committer<'a> {
         }
 
         {
-            let node_bytes = Node::node_to_bytes(Arc::clone(&node));
+            let node_clone = node.clone();
+            let node_bytes = Node::node_to_bytes(node_clone);
             let mut nodeset = self.nodes.lock().unwrap();
             nodeset.add_node(path.as_slice(), TrieNode::new(hash, Some(node_bytes)));
         }

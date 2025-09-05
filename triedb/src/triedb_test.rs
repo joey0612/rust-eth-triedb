@@ -37,6 +37,7 @@ fn test_triedb_update_all_operations_without_difflayer() {
 
 #[test]
 fn test_triedb_update_all_operations_with_difflayer() {
+    init_empty_root_node();
     // Create temporary directory for database
     let temp_dir = TempDir::new().expect("Failed to create temp directory");
     let db_path = temp_dir.path().to_str().unwrap();
@@ -46,7 +47,7 @@ fn test_triedb_update_all_operations_with_difflayer() {
     let db = PathDB::new(db_path, config).expect("Failed to create PathDB");
     let mut triedb = TrieDB::new(db);
     
-    println!("=== Starting TrieDB Test ===");
+    println!("=== Starting TrieDB Test With Difflayer===");
     
     // Test 1: Call update_all interface
     let result_one = test_update_all_initial(&mut triedb);
@@ -55,7 +56,7 @@ fn test_triedb_update_all_operations_with_difflayer() {
     let (root_hash, difflayer) = result_one.unwrap();
     test_update_all_modifications(root_hash, difflayer, &mut triedb);
     
-    println!("=== TrieDB Test Completed ===");
+    println!("=== TrieDB Test Completed With Difflayer===");
 }
 
 /// Test initial update_all operation

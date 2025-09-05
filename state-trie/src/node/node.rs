@@ -177,6 +177,12 @@ impl Node {
     }
 }
 
+impl Drop for Node {
+    fn drop(&mut self) {
+        get_global_node_reference_manager().drop_node(self);
+    }
+}
+
 static NODE_REFERENCE_MANAGER: OnceLock<NodeReferenceManager> = OnceLock::new();
 
 /// Get the initialized global node reference manager instance.
@@ -187,12 +193,18 @@ pub fn get_global_node_reference_manager() -> &'static NodeReferenceManager {
 pub struct NodeReferenceManager {
     alloc_full_nodes: Arc<Mutex<HashMap<usize, String>>>,
     alloc_short_nodes: Arc<Mutex<HashMap<usize, String>>>,
-    
+    alloc_hash_nodes: Arc<Mutex<HashMap<usize, String>>>,
+    alloc_value_nodes: Arc<Mutex<HashMap<usize, String>>>,
+
     alloc_full_count: Arc<Mutex<usize>>,
     alloc_short_count: Arc<Mutex<usize>>,
+    alloc_hash_count: Arc<Mutex<usize>>,
+    alloc_value_count: Arc<Mutex<usize>>,
 
     drop_full_count: Arc<Mutex<usize>>,
     drop_short_count: Arc<Mutex<usize>>,
+    drop_hash_count: Arc<Mutex<usize>>,
+    drop_value_count: Arc<Mutex<usize>>,
 }
 
 impl NodeReferenceManager {
@@ -200,15 +212,81 @@ impl NodeReferenceManager {
         Self {
             alloc_full_nodes: Arc::new(Mutex::new(HashMap::new())),
             alloc_short_nodes: Arc::new(Mutex::new(HashMap::new())),
+            alloc_hash_nodes: Arc::new(Mutex::new(HashMap::new())),
+            alloc_value_nodes: Arc::new(Mutex::new(HashMap::new())),
+
             alloc_full_count: Arc::new(Mutex::new(0)),
             alloc_short_count: Arc::new(Mutex::new(0)),
+            alloc_hash_count: Arc::new(Mutex::new(0)),
+            alloc_value_count: Arc::new(Mutex::new(0)),
+            
             drop_full_count: Arc::new(Mutex::new(0)),
             drop_short_count: Arc::new(Mutex::new(0)),
+            drop_hash_count: Arc::new(Mutex::new(0)),
+            drop_value_count: Arc::new(Mutex::new(0)),
         }
     }
 
-    // pub fn add_arc_node(&self, node: &Arc<Node>, remark: String) {
-    //     match node.as_ref() {
+    pub fn clear(&self) {
+        self.alloc_full_nodes.lock().unwrap().clear();
+        self.alloc_short_nodes.lock().unwrap().clear();
+        self.alloc_hash_nodes.lock().unwrap().clear();
+        self.alloc_value_nodes.lock().unwrap().clear();
+        
+        *self.alloc_full_count.lock().unwrap() = 0;
+        *self.alloc_short_count.lock().unwrap() = 0;
+        *self.alloc_hash_count.lock().unwrap() = 0;
+        *self.alloc_value_count.lock().unwrap() = 0;
+
+        *self.drop_full_count.lock().unwrap() = 0;
+        *self.drop_short_count.lock().unwrap() = 0;
+        *self.drop_hash_count.lock().unwrap() = 0;
+        *self.drop_value_count.lock().unwrap() = 0;
+    }
+
+    pub fn add_arc_node(&self, node: &Arc<Node>, remark: String) {
+        match node.as_ref() {
+            Node::Full(full) => {
+                let key = &**full as *const super::full_node::FullNode as usize;
+                self.alloc_full_nodes.lock().unwrap().insert(key, remark);
+                *self.alloc_full_count.lock().unwrap() += 1;
+            }
+            Node::Short(short) => {
+                let key = &**short as *const super::short_node::ShortNode as usize;
+                self.alloc_short_nodes.lock().unwrap().insert(key, remark);
+                *self.alloc_short_count.lock().unwrap() += 1;
+            }
+            Node::Hash(hash) => {
+                let key = hash.as_ptr() as usize;
+                self.alloc_hash_nodes.lock().unwrap().insert(key, remark);
+                *self.alloc_hash_count.lock().unwrap() += 1;
+            }
+            Node::Value(value) => {
+                let key = value.as_ptr() as usize;
+                self.alloc_value_nodes.lock().unwrap().insert(key, remark);
+                *self.alloc_value_count.lock().unwrap() += 1;
+            }
+            _ => {}
+        }
+    }
+
+    pub fn add_arc_shortnode(&self, node: &Arc<ShortNode>, remark: String) {
+        let key = &**node as *const super::short_node::ShortNode as usize;
+        self.alloc_short_nodes.lock().unwrap().insert(key, remark);
+        *self.alloc_short_count.lock().unwrap() += 1;
+    }
+
+    pub fn add_arc_fullnode(&self, node: &Arc<FullNode>, remark: String) {
+        let key = &**node as *const super::full_node::FullNode as usize;
+        self.alloc_full_nodes.lock().unwrap().insert(key, remark);
+        *self.alloc_full_count.lock().unwrap() += 1;
+    }
+    
+
+    
+
+    // pub fn add_node(&self, node: &Node, remark: String) {
+    //     match node {
     //         Node::Full(full) => {
     //             let key = &**full as *const super::full_node::FullNode as usize;
     //             self.alloc_full_nodes.lock().unwrap().insert(key, remark);
@@ -223,98 +301,98 @@ impl NodeReferenceManager {
     //     }
     // }
 
-    pub fn add_node(&self, node: &Node, remark: String) {
-        match node {
-            Node::Full(full) => {
-                let key = &**full as *const super::full_node::FullNode as usize;
-                self.alloc_full_nodes.lock().unwrap().insert(key, remark);
-                *self.alloc_full_count.lock().unwrap() += 1;
-            }
-            Node::Short(short) => {
-                let key = &**short as *const super::short_node::ShortNode as usize;
-                self.alloc_short_nodes.lock().unwrap().insert(key, remark);
-                *self.alloc_short_count.lock().unwrap() += 1;
-            }
-            _ => {}
-        }
-    }
+    // pub fn add_full_node(&self, full: &FullNode, remark: String) {
+    //     let key = full as *const super::full_node::FullNode as usize;
+    //     self.alloc_full_nodes.lock().unwrap().insert(key, remark);
+    //     *self.alloc_full_count.lock().unwrap() += 1;
+    // }
 
-    pub fn add_full_node(&self, full: &FullNode, remark: String) {
-        let key = full as *const super::full_node::FullNode as usize;
-        self.alloc_full_nodes.lock().unwrap().insert(key, remark);
-        *self.alloc_full_count.lock().unwrap() += 1;
-    }
-
-    pub fn add_short_node(&self, short: &ShortNode, remark: String) {
-        let key = short as *const super::short_node::ShortNode as usize;
-        self.alloc_short_nodes.lock().unwrap().insert(key, remark);
-        *self.alloc_short_count.lock().unwrap() += 1;
-    }
+    // pub fn add_short_node(&self, short: &ShortNode, remark: String) {
+    //     let key = short as *const super::short_node::ShortNode as usize;
+    //     self.alloc_short_nodes.lock().unwrap().insert(key, remark);
+    //     *self.alloc_short_count.lock().unwrap() += 1;
+    // }
     
     pub fn drop_short_node(&self, short: &ShortNode) {
         let key = short as *const super::short_node::ShortNode as usize;
         self.alloc_short_nodes.lock().unwrap().remove(&key);
-        *self.drop_short_count.lock().unwrap() += 1;
     }
 
     pub fn drop_full_node(&self, full: &FullNode) {
         let key = full as *const super::full_node::FullNode as usize;
         self.alloc_full_nodes.lock().unwrap().remove(&key);
-        *self.drop_full_count.lock().unwrap() += 1;
     }
+
+    // pub fn drop_hash_node(&self, hash: &HashNode) {
+    //     let key = hash.as_ptr() as usize;
+    //     self.alloc_hash_nodes.lock().unwrap().remove(&key);
+    //     *self.drop_hash_count.lock().unwrap() += 1;
+    // }
+
+    // pub fn drop_value_node(&self, value: &ValueNode) {
+    //     let key = value.as_ptr() as usize;
+    //     self.alloc_value_nodes.lock().unwrap().remove(&key);
+    //     *self.drop_value_count.lock().unwrap() += 1;
+    // }
     
 
-    // pub fn drop_node(&self, node: &Node) {
-    //     match node {
-    //         Node::Full(full) => {
-    //             if Arc::strong_count(full) - 1 == 0 {
-    //                 let key = &**full as *const super::full_node::FullNode as usize;
-    //                 if self.alloc_full_nodes.lock().unwrap().remove(&key).is_none() {
-    //                     *self.drop_more_full_count.lock().unwrap() += 1;
-    //                 }
-    //             }
-    //         }
-    //         Node::Short(short) => {
-    //             if Arc::strong_count(short) - 1 == 0 {
-    //                 let key = &**short as *const super::short_node::ShortNode as usize;
-    //                 if self.alloc_short_nodes.lock().unwrap().remove(&key).is_none() {
-    //                     *self.drop_more_short_count.lock().unwrap() += 1;
-    //                 }
-    //             }
-    //         }
-    //         _ => {}
-    //     }
-    // }
+    pub fn drop_node(&self, node: &Node) {
+        match node {
+            Node::Full(full) => {
+                if Arc::strong_count(full) - 1 == 0 {
+                    let key = &**full as *const super::full_node::FullNode as usize;
+                    self.alloc_full_nodes.lock().unwrap().remove(&key);
+                    *self.drop_full_count.lock().unwrap() += 1;
+                }
+            }
+            Node::Short(short) => {
+                if Arc::strong_count(short) - 1 == 0 {
+                    let key = &**short as *const super::short_node::ShortNode as usize;
+                    self.alloc_short_nodes.lock().unwrap().remove(&key);
+                    *self.drop_short_count.lock().unwrap() += 1;
+                }
+            }
+            Node::Hash(hash) => {
+                let key = hash.as_ptr() as usize;
+                self.alloc_hash_nodes.lock().unwrap().remove(&key);
+                *self.drop_hash_count.lock().unwrap() += 1;
+            }
+            Node::Value(value) => {
+                let key = value.as_ptr() as usize;
+                self.alloc_value_nodes.lock().unwrap().remove(&key);
+                *self.drop_value_count.lock().unwrap() += 1;
+            }
+            _ => {}
+        }
+    }
 
     pub fn debug_print(&self) {
         println!("NodeReferenceManager debug_print");
         println!("
                   alloc_full_nodes_reserved: {:?}, 
                   alloc_short_nodes_reserved: {:?}, 
-                  alloc_full_count: {:?}, 
-                  alloc_short_count: {:?}, 
-                  drop_full_count: {:?}, 
-                  drop_short_count: {:?}
+                  alloc_hash_nodes_reserved: {:?}, 
+                  alloc_value_nodes_reserved: {:?}, 
                   ", 
                 self.alloc_full_nodes.lock().unwrap().len(), 
-                self.alloc_short_nodes.lock().unwrap().len(), 
-                self.alloc_full_count.lock().unwrap(), 
-                self.alloc_short_count.lock().unwrap(), 
-                self.drop_full_count.lock().unwrap(), 
-                self.drop_short_count.lock().unwrap());
-        for (key, remark) in self.alloc_full_nodes.lock().unwrap().iter() {
-            println!("alloc_full_nodes, key: {:?}, remark: {:?}", key, remark);
-        }
-        for (key, remark) in self.alloc_short_nodes.lock().unwrap().iter() {
-            println!("alloc_short_nodes, key: {:?}, remark: {:?}", key, remark);
-        }
+                self.alloc_short_nodes.lock().unwrap().len(),
+                self.alloc_hash_nodes.lock().unwrap().len(),
+                self.alloc_value_nodes.lock().unwrap().len());
 
-        // if !self.alloc_full_nodes.lock().unwrap().is_empty() {
-        //     println!("alloc_full_nodes, no drop: {:?}", self.alloc_full_nodes.lock().unwrap());
-        // }
-        // if !self.alloc_short_nodes.lock().unwrap().is_empty() {
-        //     println!("alloc_short_nodes, no drop: {:?}", self.alloc_short_nodes.lock().unwrap());
-        // }
+        for (key, value) in self.alloc_full_nodes.lock().unwrap().iter() {
+            println!("alloc_full_nodes: {:?}, {:?}", key, value);
+        }
+        for (key, value) in self.alloc_short_nodes.lock().unwrap().iter() {
+            println!("alloc_short_nodes: {:?}, {:?}", key, value);
+        }
+        for (key, value) in self.alloc_hash_nodes.lock().unwrap().iter() {
+            println!("alloc_hash_nodes: {:?}, {:?}", key, value);
+        }
+        for (key, value) in self.alloc_value_nodes.lock().unwrap().iter() {
+            println!("alloc_value_nodes: {:?}, {:?}", key, value);
+        }
+        
+        self.clear();
         println!("NodeReferenceManager debug_print, done");
     }
 }

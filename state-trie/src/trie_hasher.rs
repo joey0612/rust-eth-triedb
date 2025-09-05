@@ -48,10 +48,13 @@ impl Hasher {
                     }
                 }
 
-                get_global_node_reference_manager().add_short_node(&cached, "Hasher short, short".to_string());
-                get_global_node_reference_manager().add_node(&hashed, "Hasher short, hashed".to_string());
+                let hashed_node = Arc::new(hashed);
+                let cached_node = Arc::new(Node::Short(Arc::new(cached)));
+
+                get_global_node_reference_manager().add_arc_node(&hashed_node, "Hasher short, hashed".to_string());
+                get_global_node_reference_manager().add_arc_node(&cached_node, "Hasher short, cached".to_string());
                 
-                (Arc::new(hashed), Arc::new(Node::Short(Arc::new(cached))))
+                (hashed_node, cached_node)
             }
             Node::Full(full) => {
                 let (collapsed, cached) = self.hash_full_node_children(full.clone());
@@ -68,10 +71,13 @@ impl Hasher {
                     }
                 }
 
-                get_global_node_reference_manager().add_full_node(&cached, "Hasher full, full".to_string());
-                get_global_node_reference_manager().add_node(&hashed, "Hasher full, hashed".to_string());
+                let hashed_node = Arc::new(hashed);
+                let cached_node = Arc::new(Node::Full(Arc::new(cached)));
 
-                (Arc::new(hashed), Arc::new(Node::Full(Arc::new(cached))))
+                get_global_node_reference_manager().add_arc_node(&cached_node, "Hasher full, cached".to_string());
+                get_global_node_reference_manager().add_arc_node(&hashed_node, "Hasher full, hashed".to_string());
+
+                (hashed_node, cached_node)
             }
             _ => {
                 (node.clone(), node)
@@ -95,7 +101,13 @@ impl Hasher {
             _ => { }
         }
 
-        (Arc::new(collapsed), Arc::new(cached))
+        let collapsed_node = Arc::new(collapsed);
+        let cached_node = Arc::new(cached);
+
+        get_global_node_reference_manager().add_arc_shortnode(&collapsed_node, "hash_short_node_children, collapsed".to_string());
+        get_global_node_reference_manager().add_arc_shortnode(&cached_node, "hash_short_node_children, cached".to_string());
+
+        (collapsed_node, cached_node)
     }
 
     /// Convert a short node to its hash representation
@@ -153,7 +165,14 @@ impl Hasher {
                 }
             }
         }
-        (Arc::new(collapsed), Arc::new(cached))
+
+        let collapsed_node = Arc::new(collapsed);
+        let cached_node = Arc::new(cached);
+
+        get_global_node_reference_manager().add_arc_fullnode(&collapsed_node, "hash_full_node_children, collapsed".to_string());
+        get_global_node_reference_manager().add_arc_fullnode(&cached_node, "hash_full_node_children, cached".to_string());
+
+        (collapsed_node, cached_node)
     }
 
     /// Convert a full node to its hash representation
