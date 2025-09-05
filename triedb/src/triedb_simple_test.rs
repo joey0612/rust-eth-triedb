@@ -13,8 +13,10 @@ use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
 use rust_eth_triedb_state_trie::node::init_empty_root_node;
 use tempfile::TempDir;
 use super::TrieDB;
+use serial_test::serial;
 
 #[test]
+#[serial]
 fn test_multiple_accounts_update() {
     // Initialize global manager
     init_empty_root_node();

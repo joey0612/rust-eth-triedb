@@ -9,9 +9,11 @@ use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
 use crate::{TrieDB, TrieDBError};
 use tempfile::TempDir;
 use once_cell::sync::Lazy;
+use serial_test::serial;
 
 /// Test basic TrieDB functionality
 #[test]
+#[serial]
 fn test_triedb_update_all_operations_without_difflayer() {
     init_empty_root_node();
 
@@ -36,6 +38,7 @@ fn test_triedb_update_all_operations_without_difflayer() {
 }
 
 #[test]
+#[serial]
 fn test_triedb_update_all_operations_with_difflayer() {
     init_empty_root_node();
     // Create temporary directory for database
