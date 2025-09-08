@@ -69,8 +69,6 @@ where
         &self.root
     }
 
-
-
     /// Gets the root hash of the trie
     pub fn hash(&mut self) -> B256 {
         if self.root == Node::empty_root() {
@@ -293,9 +291,7 @@ where
                 if resolved {
                     let mut new_short = short.to_mutable_copy_with_cow();
                     new_short.set_value(&new_child);
-
-                    let new_short_arc = Arc::new(Node::Short(Arc::new(new_short)));
-                    Ok((value, new_short_arc, true))
+                    Ok((value, Arc::new(Node::Short(Arc::new(new_short))), true))
                 } else {
                     Ok((value, node, false))
                 }
@@ -315,9 +311,7 @@ where
                 if resolved {
                     let mut new_full = full.to_mutable_copy_with_cow();
                     new_full.set_child(nibble, &new_child);
-
-                    let new_full_acr = Arc::new(Node::Full(Arc::new(new_full)));
-                    Ok((value, new_full_acr, true))
+                    Ok((value, Arc::new(Node::Full(Arc::new(new_full))), true))
                 } else {
                     Ok((value, node, false))
                 }
@@ -389,12 +383,6 @@ where
                     if !dirty {
                         return Ok((false, node));
                     } else {
-                        // let new_short = ShortNode {
-                        //     key: short.key.clone(),
-                        //     val: new_child,
-                        //     flags: self.new_flag(),
-                        // };
-
                         let new_short_arc = Arc::new(Node::Short(Arc::new(ShortNode {
                             key: short.key.clone(),
                             val: new_child,
@@ -405,7 +393,7 @@ where
                 }
 
                 // Create a branch node to split the short node
-                let mut branch = FullNode::new();
+                let mut branch = Box::new(FullNode::new());
 
                 // Insert the short node's remaining key into the branch
                 let mut short_prefix = prefix.clone();
@@ -432,21 +420,12 @@ where
 
                 // If no common prefix, return the branch directly
                 if matchlen == 0 {
-
-                    let new_full_arc = Arc::new(Node::Full(Arc::new(branch)));
-                    return Ok((true, new_full_arc));
+                    return Ok((true, Arc::new(Node::Full(Arc::from(branch)))));
                 }
-
-                // Create a new short node with the common prefix
-                // let new_short = ShortNode {
-                //     key: nibbles_key[..matchlen].to_vec(),
-                //     val: Arc::new(Node::Full(Arc::new(branch))),
-                //     flags: self.new_flag(),
-                // };
 
                 let new_short_arc = Arc::new(Node::Short(Arc::new(ShortNode {
                     key: nibbles_key[..matchlen].to_vec(),
-                    val: Arc::new(Node::Full(Arc::new(branch))),
+                    val: Arc::new(Node::Full(Arc::from(branch))),
                     flags: self.new_flag(),
                 })));
 
@@ -478,8 +457,7 @@ where
                     new_full.flags = self.new_flag();
                     new_full.set_child(nibbles_key[0] as usize, &new_child);
 
-                    let new_full_arc = Arc::new(Node::Full(Arc::new(new_full)));
-                    return Ok((true, new_full_arc));
+                    return Ok((true, Arc::new(Node::Full(Arc::new(new_full)))));
                 }
             }
 
@@ -488,9 +466,7 @@ where
 
                 // Trace the insert operation
                 self.tracer.on_insert(prefix.clone());
-
-                let short_arc = Arc::new(Node::Short(Arc::new(ShortNode::new(nibbles_key, value.as_ref()))));
-                return Ok((true, short_arc));
+                return Ok((true, Arc::new(Node::Short(Arc::new(ShortNode::new(nibbles_key, value.as_ref()))))));
             }
 
             // Hash node - resolve and continue insertion
@@ -572,11 +548,6 @@ where
                         let mut merged_key = short.key.clone();
                         merged_key.extend(&new_child_short.key);
 
-                        // let new_short = ShortNode {
-                        //     key: merged_key,
-                        //     val: new_child_short.val.clone(),
-                        //     flags: self.new_flag(),
-                        // };
                         let new_short_arc = Arc::new(Node::Short(Arc::new(ShortNode {
                             key: merged_key,
                             val: new_child_short.val.clone(),
@@ -586,11 +557,6 @@ where
                     }
                     _ => {
                         // Keep current key, update child
-                        // let new_short = ShortNode {
-                        //     key: short.key.clone(),
-                        //     val: new_child,
-                        //     flags: self.new_flag(),
-                        // };
                         let new_short_arc = Arc::new(Node::Short(Arc::new(ShortNode {
                             key: short.key.clone(),
                             val: new_child,
@@ -671,12 +637,6 @@ where
                                     let mut merged_key = vec![non_empty_pos as u8];
                                     merged_key.extend(&child_short.key);
 
-                                    // let new_short = ShortNode {
-                                    //     key: merged_key,
-                                    //     val: child_short.val.clone(),
-                                    //     flags: self.new_flag(),
-                                    // };
-
                                     let new_short_arc = Arc::new(Node::Short(Arc::new(ShortNode {
                                         key: merged_key,
                                         val: child_short.val.clone(),
@@ -687,12 +647,6 @@ where
                             }
 
                             // Create ShortNode with single child
-                            // let new_short = ShortNode {
-                            //     key: pos_nibbles,
-                            //     val: full_copy.get_child(non_empty_pos as usize),
-                            //     flags: self.new_flag(),
-                            // };
-
                             let new_short_arc =Arc::new(Node::Short(Arc::new(ShortNode {
                                 key: pos_nibbles,
                                 val: full_copy.get_child(non_empty_pos as usize),
@@ -774,17 +728,15 @@ where
         // 1. Check if the hash is in the difflayer
         if let Some(difflayer) = &self.difflayer {
             if let Some(node) = difflayer.get(&key) {
-                self.tracer.on_read(prefix, node.blob.clone().unwrap());
-                let node= Node::must_decode_node(Some(*hash), &node.blob.clone().unwrap());                
-                return Ok(node);
+                self.tracer.on_read(prefix, node.blob.clone().unwrap());              
+                return Ok(Node::must_decode_node(Some(*hash), &node.blob.clone().unwrap()));
             }
         }
 
         // 2. Check if the hash is in the database
         if let Some(node_blob) = self.database.get(&key).map_err(|e| SecureTrieError::Database(format!("{:?}", e)))? {
             self.tracer.on_read(prefix, node_blob.clone());
-            let node = Node::must_decode_node(Some(*hash), &node_blob);
-            return Ok(node);
+            return Ok(Node::must_decode_node(Some(*hash), &node_blob));
         }
 
         return Err(SecureTrieError::Database(format!("Node not found in database: owner: {:?}, prefix: {:?}, key: {:?}", self.owner, prefix, key)));

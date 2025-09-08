@@ -47,10 +47,7 @@ impl Hasher {
                         cached.flags.hash = None;
                     }
                 }
-
-                let hashed_node = Arc::new(hashed);
-                let cached_node = Arc::new(Node::Short(Arc::new(cached)));                
-                (hashed_node, cached_node)
+                (Arc::new(hashed), Arc::new(Node::Short(Arc::new(cached))))
             }
             Node::Full(full) => {
                 let (collapsed, cached) = self.hash_full_node_children(full.clone());
@@ -66,10 +63,7 @@ impl Hasher {
                         cached.flags.hash = None;
                     }
                 }
-
-                let hashed_node = Arc::new(hashed);
-                let cached_node = Arc::new(Node::Full(Arc::new(cached)));
-                (hashed_node, cached_node)
+                (Arc::new(hashed), Arc::new(Node::Full(Arc::new(cached))))
             }
             _ => {
                 (node.clone(), node)
@@ -153,10 +147,7 @@ impl Hasher {
                 }
             }
         }
-
-        let collapsed_node = Arc::new(collapsed);
-        let cached_node = Arc::new(cached);
-        (collapsed_node, cached_node)
+        (Arc::new(collapsed), Arc::new(cached))
     }
 
     /// Convert a full node to its hash representation
