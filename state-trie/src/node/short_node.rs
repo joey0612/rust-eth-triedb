@@ -9,7 +9,7 @@ use alloy_rlp::{Decodable, Encodable, Header, Error as RlpError, };
 use alloy_primitives::{keccak256, B256};
 use crate::encoding::*;
 use crate::node::rlp_raw::*;
-use super::{Node, NodeFlag, HashNode, get_global_node_reference_manager};
+use super::{Node, NodeFlag, HashNode};
 
 
 /// Short node (extension or leaf)
@@ -21,12 +21,6 @@ pub struct ShortNode {
     pub val: Arc<Node>,
     /// Node flags for caching and dirty state
     pub flags: NodeFlag,
-}
-
-impl Drop for ShortNode {
-    fn drop(&mut self) {
-        get_global_node_reference_manager().drop_short_node(self);
-    }
 }
 
 impl ShortNode {

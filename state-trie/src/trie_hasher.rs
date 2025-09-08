@@ -3,7 +3,7 @@
 //! This module provides a hasher for computing trie hashes.
 use std::sync::Arc;
 use alloy_primitives::{keccak256};
-use crate::node::{Node, ShortNode, FullNode, get_global_node_reference_manager};
+use crate::node::{Node, ShortNode, FullNode};
 use crate::encoding::hex_to_compact;
 use rayon::prelude::*;
 
@@ -49,11 +49,7 @@ impl Hasher {
                 }
 
                 let hashed_node = Arc::new(hashed);
-                let cached_node = Arc::new(Node::Short(Arc::new(cached)));
-
-                get_global_node_reference_manager().add_arc_node(&hashed_node, "Hasher short, hashed".to_string());
-                get_global_node_reference_manager().add_arc_node(&cached_node, "Hasher short, cached".to_string());
-                
+                let cached_node = Arc::new(Node::Short(Arc::new(cached)));                
                 (hashed_node, cached_node)
             }
             Node::Full(full) => {
@@ -73,10 +69,6 @@ impl Hasher {
 
                 let hashed_node = Arc::new(hashed);
                 let cached_node = Arc::new(Node::Full(Arc::new(cached)));
-
-                get_global_node_reference_manager().add_arc_node(&cached_node, "Hasher full, cached".to_string());
-                get_global_node_reference_manager().add_arc_node(&hashed_node, "Hasher full, hashed".to_string());
-
                 (hashed_node, cached_node)
             }
             _ => {
@@ -103,10 +95,6 @@ impl Hasher {
 
         let collapsed_node = Arc::new(collapsed);
         let cached_node = Arc::new(cached);
-
-        get_global_node_reference_manager().add_arc_shortnode(&collapsed_node, "hash_short_node_children, collapsed".to_string());
-        get_global_node_reference_manager().add_arc_shortnode(&cached_node, "hash_short_node_children, cached".to_string());
-
         (collapsed_node, cached_node)
     }
 
@@ -168,10 +156,6 @@ impl Hasher {
 
         let collapsed_node = Arc::new(collapsed);
         let cached_node = Arc::new(cached);
-
-        get_global_node_reference_manager().add_arc_fullnode(&collapsed_node, "hash_full_node_children, collapsed".to_string());
-        get_global_node_reference_manager().add_arc_fullnode(&cached_node, "hash_full_node_children, cached".to_string());
-
         (collapsed_node, cached_node)
     }
 
@@ -195,6 +179,7 @@ mod tests {
     use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
     use std::env;
     use alloy_primitives::{B256, keccak256};
+    use crate::node::init_empty_root_node;
 
     /// Create a test trie with specified operations
     fn create_test_trie(operations: &[(Vec<u8>, Option<Vec<u8>>)]) -> Trie<PathDB> {
@@ -352,6 +337,7 @@ mod tests {
 
     #[test]
     fn test_hasher_edge_cases() {
+        init_empty_root_node();
         println!("🔍 Testing hasher edge cases...");
 
         let parallel_hasher = Hasher::new(true);

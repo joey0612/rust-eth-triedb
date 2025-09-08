@@ -21,6 +21,6 @@ pub mod rlp_raw;
 
 // Re-export main types
 pub use full_node::FullNode;
-pub use node::{HashNode, Node, NodeFlag, ValueNode, init_empty_root_node, get_empty_root_node, get_global_node_reference_manager};
+pub use node::{HashNode, Node, NodeFlag, ValueNode, init_empty_root_node, get_empty_root_node};
 pub use node_set::{NodeSet, TrieNode, MergedNodeSet, DiffLayer};
 pub use short_node::ShortNode;

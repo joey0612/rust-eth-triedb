@@ -11,7 +11,6 @@ use super::node::{Node, NodeFlag, FullNode, ShortNode, NodeSet, TrieNode, DiffLa
 use super::secure_trie::{SecureTrieId, SecureTrieError};
 use super::trie_hasher::Hasher;
 use super::trie_tracer::TrieTracer;
-use super::node::get_global_node_reference_manager;
 
 /// Core trie implementation
 #[derive(Clone, Debug)]
@@ -296,8 +295,6 @@ where
                     new_short.set_value(&new_child);
 
                     let new_short_arc = Arc::new(Node::Short(Arc::new(new_short)));
-                    get_global_node_reference_manager().add_arc_node(&new_short_arc, "get_internal short, resolved".to_string());
-
                     Ok((value, new_short_arc, true))
                 } else {
                     Ok((value, node, false))
@@ -320,8 +317,6 @@ where
                     new_full.set_child(nibble, &new_child);
 
                     let new_full_acr = Arc::new(Node::Full(Arc::new(new_full)));
-                    get_global_node_reference_manager().add_arc_node(&new_full_acr, "get_internal full, resolved".to_string());
-
                     Ok((value, new_full_acr, true))
                 } else {
                     Ok((value, node, false))
@@ -405,8 +400,6 @@ where
                             val: new_child,
                             flags: self.new_flag(),
                         })));
-                        get_global_node_reference_manager().add_arc_node(&new_short_arc, "insert_internal short, dirty".to_string());
-
                         return Ok((true, new_short_arc));
                     }
                 }
@@ -441,9 +434,6 @@ where
                 if matchlen == 0 {
 
                     let new_full_arc = Arc::new(Node::Full(Arc::new(branch)));
-                    
-                    get_global_node_reference_manager().add_arc_node(&new_full_arc, "insert_internal short full, matchlen == 0".to_string());
-
                     return Ok((true, new_full_arc));
                 }
 
@@ -464,8 +454,6 @@ where
                 let mut trace_path = prefix.clone();
                 trace_path.extend_from_slice(&nibbles_key[..matchlen]);
                 self.tracer.on_insert(trace_path);
-
-                get_global_node_reference_manager().add_arc_node(&new_short_arc, "insert_internal short short".to_string());
 
                 return Ok((true, new_short_arc));
             }
@@ -491,8 +479,6 @@ where
                     new_full.set_child(nibbles_key[0] as usize, &new_child);
 
                     let new_full_arc = Arc::new(Node::Full(Arc::new(new_full)));
-                    get_global_node_reference_manager().add_arc_node(&new_full_arc, "insert_internal full, dirty".to_string());
-
                     return Ok((true, new_full_arc));
                 }
             }
@@ -504,9 +490,6 @@ where
                 self.tracer.on_insert(prefix.clone());
 
                 let short_arc = Arc::new(Node::Short(Arc::new(ShortNode::new(nibbles_key, value.as_ref()))));
-
-                get_global_node_reference_manager().add_arc_node(&short_arc, "insert_internal empty short".to_string());
-
                 return Ok((true, short_arc));
             }
 
@@ -599,8 +582,6 @@ where
                             val: new_child_short.val.clone(),
                             flags: self.new_flag(),
                         })));
-                        get_global_node_reference_manager().add_arc_node(&new_short_arc, "delete_internal short".to_string());
-
                         Ok((true, new_short_arc))
                     }
                     _ => {
@@ -615,9 +596,6 @@ where
                             val: new_child,
                             flags: self.new_flag(),
                         })));
-
-                        get_global_node_reference_manager().add_arc_node(&new_short_arc, "delete_internal short, short".to_string());
-
                         Ok((true, new_short_arc))
                     }
                 }
@@ -704,9 +682,6 @@ where
                                         val: child_short.val.clone(),
                                         flags: self.new_flag(),
                                     })));
-
-                                    get_global_node_reference_manager().add_arc_node(&new_short_arc, "delete_internal short, short short".to_string());
-
                                     return Ok((true, new_short_arc));
                                 }
                             }
@@ -723,23 +698,16 @@ where
                                 val: full_copy.get_child(non_empty_pos as usize),
                                 flags: self.new_flag(),
                             })));
-
-                            get_global_node_reference_manager().add_arc_node(&new_short_arc, "delete_internal short, short 4".to_string());
-
                             Ok((true, new_short_arc))
                         } else {
                             // Multiple children remain - keep as FullNode
                             let new_full_arc = Arc::new(Node::Full(Arc::new(full_copy)));
-                            get_global_node_reference_manager().add_arc_node(&new_full_arc, "delete_internal full, full".to_string());
                             Ok((true, new_full_arc))
                         }
                     }
                     _ => {
                         // Child is not empty - keep as FullNode
-
                         let new_full_arc = Arc::new(Node::Full(Arc::new(full_copy)));
-                        get_global_node_reference_manager().add_arc_node(&new_full_arc, "delete_internal other".to_string());
-
                         Ok((true, new_full_arc))
                     }
                 }
@@ -807,10 +775,7 @@ where
         if let Some(difflayer) = &self.difflayer {
             if let Some(node) = difflayer.get(&key) {
                 self.tracer.on_read(prefix, node.blob.clone().unwrap());
-                let node= Node::must_decode_node(Some(*hash), &node.blob.clone().unwrap());
-                
-                get_global_node_reference_manager().add_arc_node(&node, "resolve_and_track difflayer, node".to_string());
-                
+                let node= Node::must_decode_node(Some(*hash), &node.blob.clone().unwrap());                
                 return Ok(node);
             }
         }
@@ -819,9 +784,6 @@ where
         if let Some(node_blob) = self.database.get(&key).map_err(|e| SecureTrieError::Database(format!("{:?}", e)))? {
             self.tracer.on_read(prefix, node_blob.clone());
             let node = Node::must_decode_node(Some(*hash), &node_blob);
-            
-            get_global_node_reference_manager().add_arc_node(&node, "resolve_and_track database, node".to_string());
-
             return Ok(node);
         }
 

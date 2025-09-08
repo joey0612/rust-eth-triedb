@@ -8,7 +8,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use crate::node::{Node, FullNode, NodeSet, TrieNode, get_global_node_reference_manager};
+use crate::node::{Node, FullNode, NodeSet, TrieNode};
 use crate::trie_tracer::TrieTracer;
 use crate::encoding::hex_to_compact;
 
@@ -51,7 +51,6 @@ impl<'a> Committer<'a> {
         if let (Some(hash), false) = (hash_opt, dirty) {
             // Node already has a cached hash and is not dirty → return hash node directly
             let committed_node = Arc::new(Node::Hash(hash));
-            get_global_node_reference_manager().add_arc_node(&committed_node, "commit_internal cached hash, hash".to_string());
             return committed_node;
         }
 
@@ -77,13 +76,10 @@ impl<'a> Committer<'a> {
 
                 if let Node::Hash(hash) = hn.as_ref() {
                     let committed_node = Arc::new(Node::Hash(*hash));
-                    get_global_node_reference_manager().add_arc_node(&committed_node, "commit_internal short committed, hash".to_string());
                     return committed_node;
                 }
 
                 let committed_node = Arc::new(Node::Short(Arc::new(collapsed)));
-                get_global_node_reference_manager().add_arc_node(&committed_node, "commit_internal short committed, short".to_string());
-
                 return committed_node;
             }
             Node::Full(full) => {
@@ -101,13 +97,10 @@ impl<'a> Committer<'a> {
 
                 if let Node::Hash(hash) = hn.as_ref() {
                     let committed_node = Arc::new(Node::Hash(*hash));
-                    get_global_node_reference_manager().add_arc_node(&committed_node, "commit_internal full committed, hash".to_string());
                     return committed_node;
                 }
 
                 let committed_node = Arc::new(Node::Full(Arc::new(collapsed)));
-                get_global_node_reference_manager().add_arc_node(&committed_node, "commit_internal full committed, full".to_string());
-
                 return committed_node
             }
             Node::Hash(_) => {
@@ -202,7 +195,6 @@ impl<'a> Committer<'a> {
             if let Node::Empty = full.children[i].as_ref() {
                 continue;
             }
-            get_global_node_reference_manager().add_arc_node(&children[i], "commit_children committed, child".to_string());
         }
         children
     }
