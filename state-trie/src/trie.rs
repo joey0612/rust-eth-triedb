@@ -97,7 +97,7 @@ where
 
             let mut nodes = NodeSet::new(self.owner);
             for path in paths {
-                nodes.add_node(path.as_slice(), TrieNode::default());
+                nodes.add_node(path.as_slice(), Arc::new(TrieNode::default()));
             }
             self.committed = true;
             return Ok((EMPTY_ROOT_HASH, Some(Arc::new(nodes))));
@@ -116,7 +116,7 @@ where
         {
             let mut nodeset = nodes.lock().unwrap();
             for path in self.tracer.deleted_nodes() {
-                nodeset.add_node(path.as_slice(), TrieNode::default());
+                nodeset.add_node(path.as_slice(), Arc::new(TrieNode::default()));
             }
         }
 

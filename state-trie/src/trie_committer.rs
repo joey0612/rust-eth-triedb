@@ -209,7 +209,7 @@ impl<'a> Committer<'a> {
         if hash.is_none() {
             if self.tracer.access_list().contains_key(path.as_slice()) {
                 let mut nodeset = self.nodes.lock().unwrap();
-                nodeset.add_node(path.as_slice(), TrieNode::default());
+                nodeset.add_node(path.as_slice(), Arc::new(TrieNode::default()));
             }
             return node;
         }
@@ -218,7 +218,7 @@ impl<'a> Committer<'a> {
             let node_clone = node.clone();
             let node_bytes = Node::node_to_bytes(node_clone);
             let mut nodeset = self.nodes.lock().unwrap();
-            nodeset.add_node(path.as_slice(), TrieNode::new(hash, Some(node_bytes)));
+            nodeset.add_node(path.as_slice(), Arc::new(TrieNode::new(hash, Some(node_bytes))));
         }
 
         if self.collect_leaf {
