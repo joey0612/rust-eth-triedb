@@ -5,7 +5,7 @@
 
 #[allow(unused_imports)]
 use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable, Error as RlpError};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use alloy_primitives::B256;
 
 use super::{FullNode, ShortNode};
@@ -47,11 +47,34 @@ pub type HashNode = B256;
 /// in the trie, representing the end of a trie path.
 pub type ValueNode = Vec<u8>;
 
+static EMPTY_ROOT_NODE: OnceLock<Arc<Node>> = OnceLock::new();
+
+// Initialize the empty root node.
+/// 
+/// This function must be called once at application startup before any calls to `Node::empty_root()`.
+/// Returns an error if the empty root node has already been initialized.
+pub fn init_empty_root_node() {
+    EMPTY_ROOT_NODE.get_or_init(|| Arc::new(Node::Empty));
+}
+
+/// Get the initialized empty root node instance.
+/// 
+/// This function returns a reference to the pre-initialized empty root node.
+/// The empty root node must be initialized first by calling `init_empty_root_node()`.
+/// 
+/// # Panics
+/// 
+/// This function will panic if `init_empty_root_node()` has not been called first.
+pub fn get_empty_root_node() -> &'static Arc<Node> {
+    EMPTY_ROOT_NODE.get()
+        .expect("Empty root node not initialized. Call init_empty_root_node() first.")
+}
+
 /// Node types in the BSC-style trie
 #[derive(Debug, Clone, PartialEq)]
 pub enum Node {
     /// Empty root node
-    EmptyRoot,
+    Empty,
     /// Full node with 17 children
     Full(Arc<FullNode>),
     /// Short node (extension or leaf)
@@ -62,13 +85,12 @@ pub enum Node {
     Value(ValueNode),
 }
 
-impl Default for Node {
-    fn default() -> Self {
-        Node::EmptyRoot
-    }
-}
-
 impl Node {
+    /// Get the empty root node
+    pub fn empty_root() -> Arc<Node> {
+        get_empty_root_node().clone()
+    }
+
     /// Get the cached hash and dirty state
     pub fn cache(&self) -> (Option<HashNode>, bool) {
         match self {
@@ -76,7 +98,7 @@ impl Node {
             Node::Short(short) => return short.cache(),
             Node::Hash(_) => return (None, false),
             Node::Value(_) => return (None, false),
-            Node::EmptyRoot => return (None, false),
+            Node::Empty => return (None, false),
         }
     }
 
@@ -87,7 +109,7 @@ impl Node {
             Node::Short(short) => short.to_rlp(),
             Node::Hash(_) => panic!("Hash node should not be encoded"),
             Node::Value(_) => panic!("Value node should not be encoded"),
-            Node::EmptyRoot => panic!("EmptyRoot should not be encoded"),
+            Node::Empty => panic!("EmptyRoot should not be encoded"),
         }
     }
 
@@ -115,7 +137,8 @@ impl Node {
             }
             17 => {
                 let full_node = FullNode::from_rlp(elements, hash)?;
-                Ok(Arc::new(Node::Full(Arc::new(full_node))))
+                let node = Arc::new(Node::Full(Arc::new(full_node)));
+                Ok(node)
             }
             _ => {
                 Err(RlpError::Custom("Invalid number of list elements"))
@@ -140,7 +163,7 @@ impl Node {
             }
             // Empty reference
             Kind::String if val.is_empty() => {
-                Ok((Arc::new(Node::EmptyRoot), rest))
+                Ok((Node::empty_root(), rest))
             }
             // Hash reference
             Kind::String if val.len() == 32 => {
@@ -153,6 +176,196 @@ impl Node {
     }
 }
 
+// static NODE_REFERENCE_MANAGER: OnceLock<NodeReferenceManager> = OnceLock::new();
+
+// /// Get the initialized global node reference manager instance.
+// pub fn get_global_node_reference_manager() -> &'static NodeReferenceManager {
+//     NODE_REFERENCE_MANAGER.get_or_init(|| NodeReferenceManager::new())
+// }
+
+// pub struct NodeReferenceManager {
+//     alloc_full_nodes: Arc<Mutex<HashMap<usize, String>>>,
+//     alloc_short_nodes: Arc<Mutex<HashMap<usize, String>>>,
+//     alloc_hash_nodes: Arc<Mutex<HashMap<usize, String>>>,
+//     alloc_value_nodes: Arc<Mutex<HashMap<usize, String>>>,
+
+//     alloc_full_count: Arc<Mutex<usize>>,
+//     alloc_short_count: Arc<Mutex<usize>>,
+//     alloc_hash_count: Arc<Mutex<usize>>,
+//     alloc_value_count: Arc<Mutex<usize>>,
+
+//     drop_full_count: Arc<Mutex<usize>>,
+//     drop_short_count: Arc<Mutex<usize>>,
+//     drop_hash_count: Arc<Mutex<usize>>,
+//     drop_value_count: Arc<Mutex<usize>>,
+// }
+
+// impl NodeReferenceManager {
+//     pub fn new() -> Self {
+//         Self {
+//             alloc_full_nodes: Arc::new(Mutex::new(HashMap::new())),
+//             alloc_short_nodes: Arc::new(Mutex::new(HashMap::new())),
+//             alloc_hash_nodes: Arc::new(Mutex::new(HashMap::new())),
+//             alloc_value_nodes: Arc::new(Mutex::new(HashMap::new())),
+
+//             alloc_full_count: Arc::new(Mutex::new(0)),
+//             alloc_short_count: Arc::new(Mutex::new(0)),
+//             alloc_hash_count: Arc::new(Mutex::new(0)),
+//             alloc_value_count: Arc::new(Mutex::new(0)),
+            
+//             drop_full_count: Arc::new(Mutex::new(0)),
+//             drop_short_count: Arc::new(Mutex::new(0)),
+//             drop_hash_count: Arc::new(Mutex::new(0)),
+//             drop_value_count: Arc::new(Mutex::new(0)),
+//         }
+//     }
+
+//     pub fn clear(&self) {
+//         self.alloc_full_nodes.lock().unwrap().clear();
+//         self.alloc_short_nodes.lock().unwrap().clear();
+//         self.alloc_hash_nodes.lock().unwrap().clear();
+//         self.alloc_value_nodes.lock().unwrap().clear();
+        
+//         *self.alloc_full_count.lock().unwrap() = 0;
+//         *self.alloc_short_count.lock().unwrap() = 0;
+//         *self.alloc_hash_count.lock().unwrap() = 0;
+//         *self.alloc_value_count.lock().unwrap() = 0;
+
+//         *self.drop_full_count.lock().unwrap() = 0;
+//         *self.drop_short_count.lock().unwrap() = 0;
+//         *self.drop_hash_count.lock().unwrap() = 0;
+//         *self.drop_value_count.lock().unwrap() = 0;
+//     }
+
+//     pub fn add_arc_node(&self, node: &Arc<Node>, remark: String) {
+//         match node.as_ref() {
+//             Node::Full(full) => {
+//                 let key = &**full as *const super::full_node::FullNode as usize;
+//                 self.alloc_full_nodes.lock().unwrap().insert(key, remark);
+//                 *self.alloc_full_count.lock().unwrap() += 1;
+//             }
+//             Node::Short(short) => {
+//                 let key = &**short as *const super::short_node::ShortNode as usize;
+//                 self.alloc_short_nodes.lock().unwrap().insert(key, remark);
+//                 *self.alloc_short_count.lock().unwrap() += 1;
+//             }
+//             Node::Hash(hash) => {
+//                 let key = hash.as_ptr() as usize;
+//                 self.alloc_hash_nodes.lock().unwrap().insert(key, remark);
+//                 *self.alloc_hash_count.lock().unwrap() += 1;
+//             }
+//             Node::Value(value) => {
+//                 let key = value.as_ptr() as usize;
+//                 self.alloc_value_nodes.lock().unwrap().insert(key, remark);
+//                 *self.alloc_value_count.lock().unwrap() += 1;
+//             }
+//             _ => {}
+//         }
+//     }
+
+//     pub fn add_arc_shortnode(&self, node: &Arc<ShortNode>, remark: String) {
+//         let key = &**node as *const super::short_node::ShortNode as usize;
+//         self.alloc_short_nodes.lock().unwrap().insert(key, remark);
+//         *self.alloc_short_count.lock().unwrap() += 1;
+//     }
+
+//     pub fn add_arc_fullnode(&self, node: &Arc<FullNode>, remark: String) {
+//         let key = &**node as *const super::full_node::FullNode as usize;
+//         self.alloc_full_nodes.lock().unwrap().insert(key, remark);
+//         *self.alloc_full_count.lock().unwrap() += 1;
+//     }
+    
+//     pub fn drop_short_node(&self, short: &ShortNode) {
+//         let key = short as *const super::short_node::ShortNode as usize;
+//         self.alloc_short_nodes.lock().unwrap().remove(&key);
+//     }
+
+//     pub fn drop_full_node(&self, full: &FullNode) {
+//         let key = full as *const super::full_node::FullNode as usize;
+//         self.alloc_full_nodes.lock().unwrap().remove(&key);
+//     }    
+
+//     pub fn drop_node(&self, node: &Node) {
+//         match node {
+//             Node::Full(full) => {
+//                 if Arc::strong_count(full) - 1 == 0 {
+//                     let key = &**full as *const super::full_node::FullNode as usize;
+//                     self.alloc_full_nodes.lock().unwrap().remove(&key);
+//                     *self.drop_full_count.lock().unwrap() += 1;
+//                 }
+//             }
+//             Node::Short(short) => {
+//                 if Arc::strong_count(short) - 1 == 0 {
+//                     let key = &**short as *const super::short_node::ShortNode as usize;
+//                     self.alloc_short_nodes.lock().unwrap().remove(&key);
+//                     *self.drop_short_count.lock().unwrap() += 1;
+//                 }
+//             }
+//             Node::Hash(hash) => {
+//                 let key = hash.as_ptr() as usize;
+//                 self.alloc_hash_nodes.lock().unwrap().remove(&key);
+//                 *self.drop_hash_count.lock().unwrap() += 1;
+//             }
+//             Node::Value(value) => {
+//                 let key = value.as_ptr() as usize;
+//                 self.alloc_value_nodes.lock().unwrap().remove(&key);
+//                 *self.drop_value_count.lock().unwrap() += 1;
+//             }
+//             _ => {}
+//         }
+//     }
+
+//     pub fn debug_print(&self) {
+//         println!("NodeReferenceManager debug_print");
+//         println!("
+//                   alloc_full_nodes_reserved: {:?}, 
+//                   alloc_short_nodes_reserved: {:?}, 
+//                   alloc_hash_nodes_reserved: {:?}, 
+//                   alloc_value_nodes_reserved: {:?},
+
+//                   alloc_full_count: {:?},
+//                   alloc_short_count: {:?},
+//                   alloc_hash_count: {:?},
+//                   alloc_value_count: {:?},
+
+//                   drop_full_count: {:?},
+//                   drop_short_count: {:?},
+//                   drop_hash_count: {:?},
+//                   drop_value_count: {:?},
+//                   ", 
+//                 self.alloc_full_nodes.lock().unwrap().len(), 
+//                 self.alloc_short_nodes.lock().unwrap().len(),
+//                 self.alloc_hash_nodes.lock().unwrap().len(),
+//                 self.alloc_value_nodes.lock().unwrap().len(),
+
+//                 *self.alloc_full_count.lock().unwrap(),
+//                 *self.alloc_short_count.lock().unwrap(),
+//                 *self.alloc_hash_count.lock().unwrap(),
+//                 *self.alloc_value_count.lock().unwrap(),
+                
+//                 *self.drop_full_count.lock().unwrap(),
+//                 *self.drop_short_count.lock().unwrap(),
+//                 *self.drop_hash_count.lock().unwrap(),
+//                 *self.drop_value_count.lock().unwrap());
+
+//         for (key, value) in self.alloc_full_nodes.lock().unwrap().iter() {
+//             println!("alloc_full_nodes: {:?}, {:?}", key, value);
+//         }
+//         for (key, value) in self.alloc_short_nodes.lock().unwrap().iter() {
+//             println!("alloc_short_nodes: {:?}, {:?}", key, value);
+//         }
+//         for (key, value) in self.alloc_hash_nodes.lock().unwrap().iter() {
+//             println!("alloc_hash_nodes: {:?}, {:?}", key, value);
+//         }
+//         for (key, value) in self.alloc_value_nodes.lock().unwrap().iter() {
+//             println!("alloc_value_nodes: {:?}, {:?}", key, value);
+//         }
+        
+//         self.clear();
+//         println!("NodeReferenceManager debug_print, done");
+//     }
+// }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -161,6 +374,8 @@ mod tests {
 
     #[test]
     fn fullnode_roundtrip_basic() {
+        init_empty_root_node();
+
         // Build a simple full node with only value (17th) set
         let mut original = FullNode::new();
         let value_bytes = vec![0xAA, 0xBB, 0xCC];
@@ -177,7 +392,7 @@ mod tests {
             Node::Full(full) => {
                 // Children 0..=15 should be EmptyRoot by default
                 for i in 0..16 {
-                    assert!(matches!(full.get_child(i).as_ref(), Node::EmptyRoot));
+                    assert!(matches!(full.get_child(i).as_ref(), Node::Empty));
                 }
                 // 17th child is value node and should match
                 match full.get_child(16).as_ref() {
@@ -255,6 +470,7 @@ mod tests {
 
     #[test]
     fn shortnode_with_fullnode_value_with_1byte_in_17th_child() {
+        init_empty_root_node();
         // Inner full node with 17th (index 16) child = 1-byte value
         let mut inner_full = FullNode::new();
         inner_full.set_child(16, &Node::Value(vec![0x02]));

@@ -28,8 +28,8 @@ impl Hasher {
     /// Hash a node and return both the hashed and cached versions
     pub fn hash(&self, node: Arc<Node>, force: bool) -> (Arc<Node>, Arc<Node>) {
         let (hash, _) = node.cache();
-        if !hash.is_none() {
-            return (Arc::new(Node::Hash(hash.unwrap())), node)
+        if let Some(hash) = hash {
+            return (Arc::new(Node::Hash(hash)), node)
         }
 
         match &*node {
@@ -63,7 +63,6 @@ impl Hasher {
                         cached.flags.hash = None;
                     }
                 }
-
                 (Arc::new(hashed), Arc::new(Node::Full(Arc::new(cached))))
             }
             _ => {
@@ -88,7 +87,9 @@ impl Hasher {
             _ => { }
         }
 
-        (Arc::new(collapsed), Arc::new(cached))
+        let collapsed_node = Arc::new(collapsed);
+        let cached_node = Arc::new(cached);
+        (collapsed_node, cached_node)
     }
 
     /// Convert a short node to its hash representation
@@ -113,8 +114,8 @@ impl Hasher {
                 .into_par_iter()
                 .map(|i| {
                     match &*full.children[i] {
-                        Node::EmptyRoot => {
-                            (Arc::new(Node::EmptyRoot), Arc::new(Node::EmptyRoot))
+                        Node::Empty => {
+                            (Node::empty_root(), Node::empty_root())
                         }
                         _ => {
                             // Initialize a new hasher for each parallel task
@@ -134,7 +135,7 @@ impl Hasher {
         } else {
             for i in 0..16 {
                 match &*full.children[i] {
-                    Node::EmptyRoot => {
+                    Node::Empty => {
                         continue;
                     }
                     _ => {
@@ -169,6 +170,7 @@ mod tests {
     use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
     use std::env;
     use alloy_primitives::{B256, keccak256};
+    use crate::node::init_empty_root_node;
 
     /// Create a test trie with specified operations
     fn create_test_trie(operations: &[(Vec<u8>, Option<Vec<u8>>)]) -> Trie<PathDB> {
@@ -326,13 +328,14 @@ mod tests {
 
     #[test]
     fn test_hasher_edge_cases() {
+        init_empty_root_node();
         println!("🔍 Testing hasher edge cases...");
 
         let parallel_hasher = Hasher::new(true);
         let serial_hasher = Hasher::new(false);
 
         // Test with empty node
-        let empty_node = Arc::new(Node::EmptyRoot);
+        let empty_node = Node::empty_root();
         let (parallel_empty, _) = parallel_hasher.hash(empty_node.clone(), false);
         let (serial_empty, _) = serial_hasher.hash(empty_node.clone(), false);
 

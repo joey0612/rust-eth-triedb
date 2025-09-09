@@ -4,15 +4,19 @@ use std::str::FromStr;
 use alloy_primitives::{keccak256, Address, B256, U256};
 use alloy_trie::{EMPTY_ROOT_HASH};
 use rust_eth_triedb_state_trie::account::StateAccount;
-use rust_eth_triedb_state_trie::node::MergedNodeSet;
+use rust_eth_triedb_state_trie::node::{MergedNodeSet, init_empty_root_node};
 use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
 use crate::{TrieDB, TrieDBError};
 use tempfile::TempDir;
 use once_cell::sync::Lazy;
+use serial_test::serial;
 
 /// Test basic TrieDB functionality
 #[test]
+#[serial]
 fn test_triedb_update_all_operations_without_difflayer() {
+    init_empty_root_node();
+
     // Create temporary directory for database
     let temp_dir = TempDir::new().expect("Failed to create temp directory");
     let db_path = temp_dir.path().to_str().unwrap();
@@ -34,7 +38,9 @@ fn test_triedb_update_all_operations_without_difflayer() {
 }
 
 #[test]
+#[serial]
 fn test_triedb_update_all_operations_with_difflayer() {
+    init_empty_root_node();
     // Create temporary directory for database
     let temp_dir = TempDir::new().expect("Failed to create temp directory");
     let db_path = temp_dir.path().to_str().unwrap();
@@ -44,7 +50,7 @@ fn test_triedb_update_all_operations_with_difflayer() {
     let db = PathDB::new(db_path, config).expect("Failed to create PathDB");
     let mut triedb = TrieDB::new(db);
     
-    println!("=== Starting TrieDB Test ===");
+    println!("=== Starting TrieDB Test With Difflayer===");
     
     // Test 1: Call update_all interface
     let result_one = test_update_all_initial(&mut triedb);
@@ -53,7 +59,7 @@ fn test_triedb_update_all_operations_with_difflayer() {
     let (root_hash, difflayer) = result_one.unwrap();
     test_update_all_modifications(root_hash, difflayer, &mut triedb);
     
-    println!("=== TrieDB Test Completed ===");
+    println!("=== TrieDB Test Completed With Difflayer===");
 }
 
 /// Test initial update_all operation
@@ -122,7 +128,7 @@ fn test_update_all_initial(triedb: &mut TrieDB<PathDB>) -> Result<(B256, Option<
             // Call flush and print hash
             if let Some(nodes) = node_set {
                 let difflayer = nodes.to_difflayer();
-                let flush_result = triedb.flush(0, B256::ZERO, Some(difflayer));
+                let flush_result = triedb.flush(0, B256::ZERO, &Some(difflayer));
                 match flush_result {
                     Ok(()) => println!("flush executed successfully"),
                     Err(e) => println!("flush failed: {:?}", e),
@@ -214,7 +220,7 @@ fn test_update_all_modifications(root_hash: B256, difflayer: Option<Arc<MergedNo
                 
                 let difflayer = node_sets.to_difflayer();
                 // Call flush and print hash
-                let flush_result = triedb.flush(0, B256::ZERO, Some(difflayer));
+                let flush_result = triedb.flush(0, B256::ZERO, &Some(difflayer));
                 match flush_result {
                     Ok(()) => println!("Modification flush executed successfully"),
                     Err(e) => println!("Modification flush failed: {:?}", e),

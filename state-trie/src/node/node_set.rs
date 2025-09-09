@@ -374,7 +374,7 @@ mod tests {
     }
 
     fn make_node(hash_byte: u8, blob_bytes: &[u8]) -> Arc<TrieNode> {
-        Arc::new(TrieNode::new(Some(b256(hash_byte)), Some(blob_bytes.to_vec())))
+       Arc::new(TrieNode::new(Some(b256(hash_byte)), Some(blob_bytes.to_vec())))
     }
 
     #[test]
@@ -383,7 +383,7 @@ mod tests {
         assert_eq!(set.size(), (0, 0));
 
         set.add_node(b"abc", make_node(1, b"v1"));
-        set.add_node(b"def", Arc::new(TrieNode { hash: Some(B256::ZERO), blob: Some(Vec::new()) })); // deleted
+        set.add_node(b"def", Arc::new(TrieNode::new(Some(B256::ZERO), Some(Vec::new())))); // deleted
         assert_eq!(set.size(), (1, 1));
         assert_eq!(set.nodes().len(), 2);
     }

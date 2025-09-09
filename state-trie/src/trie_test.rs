@@ -4,11 +4,13 @@ use alloy_primitives::{B256, keccak256};
 use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
 use crate::secure_trie::{SecureTrieBuilder, SecureTrieId};
 use crate::traits::SecureTrieTrait;
-
+use super::node::init_empty_root_node;
 use std::env;
 
 #[test]
 fn test_trie_update_and_get() {
+    init_empty_root_node();
+
     // Create temporary directory path
     let temp_dir = env::temp_dir().join("trie_test_pathdb");
     let db_path = temp_dir.to_str().unwrap();
@@ -197,6 +199,8 @@ fn test_trie_nonexistent_key() {
 
 #[test]
 fn test_trie_binary_data() {
+    init_empty_root_node();
+
     // Create temporary directory path
     let temp_dir = env::temp_dir().join("trie_test_binary");
     let db_path = temp_dir.to_str().unwrap();
@@ -1982,7 +1986,7 @@ fn test_committer_parallel_equivalence() {
     let nodes_serial = Arc::new(Mutex::new(NodeSet::new(owner)));
     let tracer_serial_ref = &st1.trie().tracer;
     let mut comm_serial = Committer::new(nodes_serial.clone(), tracer_serial_ref, true);
-    let hash_node_serial = comm_serial.commit(st1.trie().root(), false);
+    let hash_node_serial = comm_serial.commit(st1.trie().root().clone(), false);
     let root_hash_serial = match hash_node_serial.as_ref() {
         Node::Hash(h) => *h,
         _ => panic!("serial committer did not return Hash node"),
@@ -1992,7 +1996,7 @@ fn test_committer_parallel_equivalence() {
     let nodes_parallel = Arc::new(Mutex::new(NodeSet::new(owner)));
     let tracer_parallel = &st2.trie().tracer;
     let mut comm_parallel = Committer::new(nodes_parallel.clone(), tracer_parallel, true);
-    let hash_node_parallel = comm_parallel.commit(st2.trie().root(), true);
+    let hash_node_parallel = comm_parallel.commit(st2.trie().root().clone(), true);
     let root_hash_parallel = match hash_node_parallel.as_ref() {
         Node::Hash(h) => *h,
         _ => panic!("parallel committer did not return Hash node"),

@@ -63,19 +63,36 @@ pub enum TrieDBError {
 }
 
 /// Trie database implementation
-#[derive(Clone)]
 pub struct TrieDB<DB> 
 where
     DB: TrieDatabase + Clone + Send + Sync,
     DB::Error: std::fmt::Debug,
 {
     root_hash: B256,
-    account_trie: StateTrie<DB>,
+    account_trie: Option<StateTrie<DB>>,
     storage_tries: HashMap<B256, StateTrie<DB>>,
     accounts_with_storage_trie: HashMap<B256, StateAccount>,
     difflayer: Option<Arc<DiffLayer>>,
-    db: DB,
+    pub db: DB,
     metrics: TrieDBMetrics,
+}
+
+impl<DB> Clone for TrieDB<DB>
+where
+    DB: TrieDatabase + Clone + Send + Sync,
+    DB::Error: std::fmt::Debug,
+{
+    fn clone(&self) -> Self {
+        Self {
+            root_hash: EMPTY_ROOT_HASH,
+            account_trie: None,
+            storage_tries: HashMap::new(),
+            accounts_with_storage_trie: HashMap::new(),
+            difflayer: None,
+            db: self.db.clone(),
+            metrics: self.metrics.clone()
+        }
+    }
 }
 
 /// External Initializer and getters 
@@ -86,16 +103,9 @@ where
 {
     /// Creates a new trie database
     pub fn new(db: DB) -> Self {
-        let id = SecureTrieId::new(EMPTY_ROOT_HASH);
-        let account_trie = 
-            SecureTrieBuilder::new(db.clone())
-            .with_id(id)
-            .build_with_difflayer(None)
-            .unwrap();
-
         Self {
             root_hash: EMPTY_ROOT_HASH,
-            account_trie: account_trie,
+            account_trie: None,
             storage_tries: HashMap::new(),
             accounts_with_storage_trie: HashMap::new(),
             difflayer: None,
@@ -107,10 +117,11 @@ where
     /// Reset the state of the trie db to the given root hash and difflayer
     pub fn state_at(&mut self, root_hash: B256, difflayer: Option<Arc<DiffLayer>>) -> Result<(), TrieDBError> {
         let id = SecureTrieId::new(root_hash);
-        self.account_trie = 
+        self.account_trie = Some(
             SecureTrieBuilder::new(self.db.clone())
             .with_id(id)
-            .build_with_difflayer(difflayer.as_ref())?;
+            .build_with_difflayer(difflayer.as_ref())?
+        );
         self.root_hash = root_hash;
         self.difflayer = difflayer;
         self.storage_tries.clear();
@@ -121,6 +132,15 @@ where
     /// Gets a mutable reference to the database
     pub fn get_mut_db_ref(&mut self) -> &mut DB {
         &mut self.db
+    }
+
+    /// Clean the trie db
+    pub fn clean(&mut self) {
+        self.root_hash = EMPTY_ROOT_HASH;
+        self.account_trie = None;
+        self.storage_tries.clear();
+        self.accounts_with_storage_trie.clear();
+        self.difflayer = None;
     }
 }
 
@@ -176,15 +196,15 @@ where
     DB::Error: std::fmt::Debug,
 {
     pub fn get_account(&mut self, address: Address) -> Result<Option<StateAccount>, TrieDBError> {
-        Ok(self.account_trie.get_account(address)?)
+        Ok(self.account_trie.as_mut().unwrap().get_account(address)?)
     }
 
     pub fn update_account(&mut self, address: Address, account: &StateAccount) -> Result<(), TrieDBError> {
-        Ok(self.account_trie.update_account(address, account)?)
+        Ok(self.account_trie.as_mut().unwrap().update_account(address, account)?)
     }
 
     pub fn delete_account(&mut self, address: Address) -> Result<(), TrieDBError> {
-        Ok(self.account_trie.delete_account(address)?)
+        Ok(self.account_trie.as_mut().unwrap().delete_account(address)?)
     }
 
     pub fn get_storage(&mut self, address: Address, key: &[u8]) -> Result<Option<Vec<u8>>, TrieDBError> {
@@ -207,19 +227,30 @@ where
     pub fn calculate_hash(&mut self) -> Result<B256, TrieDBError> {
         let hash_start = Instant::now();
 
-        let storage_hashes: HashMap<B256, B256> = self.storage_tries
+        let (storage_hashes, storage_tries): (HashMap<B256, B256>, HashMap<B256, StateTrie<DB>>) = self.storage_tries
         .par_iter()
-        .map(|(key, trie)| (*key, trie.clone().hash()))
-        .collect();
+        .map(|(key, trie)| {
+            let mut trie_clone = trie.clone();
+            let hash = trie_clone.hash();
+            (*key, hash, trie_clone)
+        })
+        .collect::<Vec<_>>()
+        .into_iter()
+        .fold((HashMap::new(), HashMap::new()), |(mut hashes, mut tries), (key, hash, trie)| {
+            hashes.insert(key, hash);
+            tries.insert(key, trie);
+            (hashes, tries)
+        });
 
         for (hashed_address, storage_hash) in storage_hashes {   
             let mut account = self.accounts_with_storage_trie.get(&hashed_address).unwrap().clone();
             account.storage_root = storage_hash;
             self.update_account_with_hash_state(hashed_address, &account)?;
         }
+        self.storage_tries = storage_tries;
 
         self.metrics.record_hash_duration(hash_start.elapsed().as_secs_f64());
-        Ok(self.account_trie.hash())
+        Ok(self.account_trie.as_mut().unwrap().hash())
     }
 
     pub fn commit(&mut self, _collect_leaf: bool) -> Result<(B256, Arc<MergedNodeSet>), TrieDBError> {
@@ -229,7 +260,7 @@ where
         let mut merged_node_set = MergedNodeSet::new();
 
         // Start both tasks in parallel using rayon
-        let mut account_trie_clone = self.account_trie.clone();
+        let mut account_trie_clone = self.account_trie.as_mut().unwrap().clone();
         let (account_commit_result, storage_commit_results): (Result<(B256, Option<Arc<NodeSet>>), _>, Vec<(B256, Option<Arc<NodeSet>>)>) = rayon::join(
             || account_trie_clone.commit(true),
             || self.storage_tries
@@ -240,6 +271,7 @@ where
                 })
                 .collect()
         );
+        drop(account_trie_clone);
 
         let (_, account_node_set) = account_commit_result?;
 
@@ -256,7 +288,7 @@ where
         }
 
         self.metrics.record_commit_duration(commit_start.elapsed().as_secs_f64());
-        Ok((root_hash, Arc::new(merged_node_set))) 
+        Ok((root_hash, Arc::new(merged_node_set)))
     }
 }
 
@@ -269,15 +301,15 @@ where
     DB::Error: std::fmt::Debug,
 {
     pub fn get_account_with_hash_state(&mut self, hashed_address: B256) -> Result<Option<StateAccount>, TrieDBError> {
-        Ok(self.account_trie.get_account_with_hash_state(hashed_address)?)
+        Ok(self.account_trie.as_mut().unwrap().get_account_with_hash_state(hashed_address)?)
     }
 
     pub fn update_account_with_hash_state(&mut self, hashed_address: B256, account: &StateAccount) -> Result<(), TrieDBError> {
-        Ok(self.account_trie.update_account_with_hash_state(hashed_address, account)?)
+        Ok(self.account_trie.as_mut().unwrap().update_account_with_hash_state(hashed_address, account)?)
     }
     
     pub fn delete_account_with_hash_state(&mut self, hashed_address: B256) -> Result<(), TrieDBError> {
-        Ok(self.account_trie.delete_account_with_hash_state(hashed_address)?)
+        Ok(self.account_trie.as_mut().unwrap().delete_account_with_hash_state(hashed_address)?)
     }
 
     pub fn get_storage_with_hash_state(&mut self, hashed_address: B256, hashed_key: B256) -> Result<Option<Vec<u8>>, TrieDBError> {
@@ -313,7 +345,6 @@ where
         difflayer: Option<Arc<DiffLayer>>, 
         hashed_post_state: &HashedPostState) -> 
         Result<(B256, Option<Arc<DiffLayer>>), TrieDBError> {
-
         let mut states: HashMap<alloy_primitives::FixedBytes<32>, Option<StateAccount>> = HashMap::new();
         let mut states_rebuild = HashSet::new();
         let mut storage_states = HashMap::new();
@@ -390,7 +421,6 @@ where
         states_rebuild: HashSet<B256>,
         storage_states: HashMap<B256, HashMap<B256, Option<U256>>>) -> 
         Result<(B256, Option<Arc<MergedNodeSet>>), TrieDBError> {
-
         // 1. Reset the trie db state
         self.state_at(root_hash, difflayer)?;
 
@@ -484,8 +514,13 @@ where
         );
         self.storage_tries = update_storage;
 
+        drop(db_clone);
+        drop(difflayer_clone);
+
         // 5. Commit the changes
         let (root_hash, node_set) = self.commit(true)?;
+        self.clean();
+
         Ok((root_hash, Some(node_set)))
     }
 }
@@ -497,7 +532,7 @@ where
     DB: TrieDatabase + Clone + Send + Sync,
     DB::Error: std::fmt::Debug,
 {
-    pub fn flush(&mut self, block_number: u64, state_root: B256, update_nodes: Option<Arc<DiffLayer>>) -> Result<(), TrieDBError> {
+    pub fn flush(&mut self, block_number: u64, state_root: B256, update_nodes: &Option<Arc<DiffLayer>>) -> Result<(), TrieDBError> {
         let flush_start = Instant::now();
 
         if let Some(difflayer) = update_nodes {

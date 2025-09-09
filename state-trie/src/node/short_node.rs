@@ -115,7 +115,7 @@ impl Encodable for ShortNode {
 
         // Encode value based on node type
         match self.val.as_ref() {
-            Node::EmptyRoot => {
+            Node::Empty => {
                 // Empty root encoded as empty string [0x80]
                 temp_buf.push(alloy_rlp::EMPTY_STRING_CODE);
             }
