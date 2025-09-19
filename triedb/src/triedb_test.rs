@@ -189,9 +189,14 @@ fn test_update_all_modifications(root_hash: B256, difflayer: Option<Arc<MergedNo
     println!("Preparing to delete {} accounts", 10);
     println!("Preparing to update {} storage states", storage_states.len());
     
-    let difflayer = difflayer.as_ref().map(|d| d.to_difflayer());
+    let difflayers = if let Some(d) = difflayer.as_ref() {
+        let difflayer = d.to_difflayer();
+        Some(vec![difflayer])
+    } else {
+        None
+    };
     // Call update_all interface
-    let result = triedb.update_and_commit(root_hash, difflayer, states, HashSet::new(), storage_states);
+    let result = triedb.update_and_commit(root_hash, difflayers.as_ref(), states, HashSet::new(), storage_states);
     
     match result {
         Ok((root_hash, node_set)) => {

@@ -37,4 +37,4 @@ pub use secure_trie::{SecureTrieId, SecureTrieBuilder, SecureTrieError};
 // pub use state_trie::{StateTrie, SecureTrie};
 pub use account::StateAccount;
 pub use traits::SecureTrieTrait;
-pub use node::{NodeSet, TrieNode, DiffLayer};
+pub use node::{NodeSet, TrieNode, DiffLayer, DiffLayers};

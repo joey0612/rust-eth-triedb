@@ -5,8 +5,7 @@ use rust_eth_triedb_common::TrieDatabase;
 use thiserror::Error;
 use alloy_trie::EMPTY_ROOT_HASH;
 use super::state_trie::StateTrie;
-use super::node::DiffLayer;
-use std::sync::Arc;
+use super::node::DiffLayers;
 
 // use super::state_trie::StateTrie;
 
@@ -99,7 +98,7 @@ where
     }
 
     /// Builds the secure trie with difflayer
-    pub fn build_with_difflayer(self, difflayer: Option<&Arc<DiffLayer>>) -> Result<StateTrie<DB>, SecureTrieError> {
+    pub fn build_with_difflayer(self, difflayer: Option<&DiffLayers>) -> Result<StateTrie<DB>, SecureTrieError> {
         let id = self.id.unwrap_or_else(|| SecureTrieId::default());
         StateTrie::new(id, self.database, difflayer)
     }

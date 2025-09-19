@@ -10,7 +10,7 @@ use super::account::StateAccount;
 use super::secure_trie::{SecureTrieId, SecureTrieError};
 use super::traits::SecureTrieTrait;
 use super::trie::Trie;
-use super::node::{NodeSet, DiffLayer};
+use super::node::{NodeSet, DiffLayers};
 use super::node::rlp_raw;
 
 /// State trie implementation that wraps a trie with secure key hashing
@@ -38,7 +38,7 @@ where
     DB::Error: std::fmt::Debug,
 {
     /// Creates a new state trie with the given identifier and database
-    pub fn new(id: SecureTrieId, database: DB, difflayer: Option<&Arc<DiffLayer>>) -> Result<Self, SecureTrieError> {
+    pub fn new(id: SecureTrieId, database: DB, difflayer: Option<&DiffLayers>) -> Result<Self, SecureTrieError> {
         let trie = Trie::new(&id, database, difflayer)?;
         Ok(Self { trie, id })
     }

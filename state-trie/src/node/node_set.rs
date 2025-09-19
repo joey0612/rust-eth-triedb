@@ -252,6 +252,8 @@ impl std::fmt::Debug for NodeSet {
 /// Alias for difflayer node mapping
 pub type DiffLayer = HashMap<Vec<u8>, Arc<TrieNode>>;
 
+pub type DiffLayers = Vec<Arc<DiffLayer>>;
+
 /// MergedNodeSet is a set of node sets that are merged together.
 #[derive(Debug, Clone)]
 #[allow(dead_code)]

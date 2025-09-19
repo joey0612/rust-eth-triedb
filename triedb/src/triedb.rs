@@ -9,7 +9,7 @@ use alloy_primitives::{keccak256, Address, B256, U256};
 use alloy_trie::{EMPTY_ROOT_HASH};
 use reth_trie_common::HashedPostState;
 use rust_eth_triedb_common::TrieDatabase;
-use rust_eth_triedb_state_trie::node::{MergedNodeSet, NodeSet, DiffLayer};
+use rust_eth_triedb_state_trie::node::{MergedNodeSet, NodeSet, DiffLayer, DiffLayers};
 use rust_eth_triedb_state_trie::state_trie::StateTrie;
 use rust_eth_triedb_state_trie::account::StateAccount;
 use rust_eth_triedb_state_trie::{SecureTrieId, SecureTrieTrait, SecureTrieBuilder};
@@ -72,7 +72,7 @@ where
     account_trie: Option<StateTrie<DB>>,
     storage_tries: HashMap<B256, StateTrie<DB>>,
     accounts_with_storage_trie: HashMap<B256, StateAccount>,
-    difflayer: Option<Arc<DiffLayer>>,
+    difflayer: Option<DiffLayers>,
     pub db: DB,
     metrics: TrieDBMetrics,
 }
@@ -115,15 +115,15 @@ where
     }
 
     /// Reset the state of the trie db to the given root hash and difflayer
-    pub fn state_at(&mut self, root_hash: B256, difflayer: Option<Arc<DiffLayer>>) -> Result<(), TrieDBError> {
+    pub fn state_at(&mut self, root_hash: B256, difflayer: Option<&DiffLayers>) -> Result<(), TrieDBError> {
         let id = SecureTrieId::new(root_hash);
         self.account_trie = Some(
             SecureTrieBuilder::new(self.db.clone())
             .with_id(id)
-            .build_with_difflayer(difflayer.as_ref())?
+            .build_with_difflayer(difflayer)?
         );
         self.root_hash = root_hash;
-        self.difflayer = difflayer;
+        self.difflayer = difflayer.map(|d| d.clone());
         self.storage_tries.clear();
         self.accounts_with_storage_trie.clear();
         Ok(())
@@ -342,7 +342,7 @@ where
     pub fn commit_hashed_post_state(
         &mut self, 
         root_hash: B256, 
-        difflayer: Option<Arc<DiffLayer>>, 
+        difflayer: Option<&DiffLayers>, 
         hashed_post_state: &HashedPostState) -> 
         Result<(B256, Option<Arc<DiffLayer>>), TrieDBError> {
         let mut states: HashMap<alloy_primitives::FixedBytes<32>, Option<StateAccount>> = HashMap::new();
@@ -416,7 +416,7 @@ where
     pub fn update_and_commit(
         &mut self, 
         root_hash: B256, 
-        difflayer: Option<Arc<DiffLayer>>, 
+        difflayer: Option<&DiffLayers>, 
         states: HashMap<B256, Option<StateAccount>>,
         states_rebuild: HashSet<B256>,
         storage_states: HashMap<B256, HashMap<B256, Option<U256>>>) -> 
