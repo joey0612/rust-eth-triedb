@@ -7,7 +7,7 @@ use std::sync::Mutex;
 
 use rocksdb::{DB, Options, ReadOptions, WriteBatch, WriteOptions};
 use schnellru::{ByLength, LruMap};
-use tracing::{error, trace};
+use tracing::{error, trace, warn};
 
 use crate::traits::*;
 use rust_eth_triedb_common::{TrieDatabase,TrieDatabaseBatch};
@@ -117,7 +117,7 @@ impl<'a> PathDB {
 
     /// Clear the LRU cache.
     pub fn clear_cache(&self) {
-        trace!(target: "pathdb::rocksdb", "Clearing LRU cache");
+        warn!(target: "pathdb::rocksdb", "Clearing LRU cache");
         self.cache.lock().unwrap().clear();
     }
 
@@ -380,6 +380,10 @@ impl TrieDatabase for PathDB {
 
     fn remove(&self, path: &[u8]) {
         let _ = self.delete_raw( path);
+    }
+
+    fn clear_cache(&self) {
+        self.clear_cache();
     }
 
     fn create_batch(&self) -> Result<Self::Batch, Self::Error> {

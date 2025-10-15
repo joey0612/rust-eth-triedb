@@ -573,6 +573,10 @@ where
         self.metrics.record_flush_duration(flush_start.elapsed().as_secs_f64());
         Ok(())
     }
+
+    pub fn clear_cache(&mut self) {
+        self.db.clear_cache();
+    }
 }
 
 

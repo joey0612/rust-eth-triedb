@@ -49,4 +49,7 @@ pub trait TrieDatabase {
 
     /// Commit a batch of operations atomically
     fn batch_commit(&self, batch: Self::Batch) -> Result<(), Self::Error>;
+
+    /// Clear the cache
+    fn clear_cache(&self);
 }

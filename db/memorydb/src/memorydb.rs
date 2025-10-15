@@ -167,6 +167,10 @@ impl TrieDatabase for MemoryDB {
         let _ = self.nodes.write().remove(path);
     }
 
+    fn clear_cache(&self) {
+        return;
+    }
+
     fn create_batch(&self) -> Result<Self::Batch, Self::Error> {
         Ok(MemoryDBBatch::new())
     }
