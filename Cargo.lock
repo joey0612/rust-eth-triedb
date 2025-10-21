@@ -2507,6 +2507,7 @@ dependencies = [
  "rust-eth-triedb-common",
  "rust-eth-triedb-pathdb",
  "rust-eth-triedb-state-trie",
+ "schnellru",
  "serde",
  "serial_test",
  "tempfile",

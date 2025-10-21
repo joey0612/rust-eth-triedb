@@ -26,6 +26,9 @@ alloy-trie.workspace = true
 reth-trie-common.workspace = true
 reth-metrics = { workspace = true, features = ["common"] }
 
+# LRU Cache
+schnellru.workspace = true
+
 # metrics (required by reth-metrics derive macro)
 metrics.workspace = true
 
