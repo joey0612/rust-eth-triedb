@@ -24,6 +24,13 @@ use reth_metrics::{
 #[derive(Metrics, Clone)]
 #[metrics(scope = "rust.eth.triedb")]
 pub(crate) struct TrieDBMetrics {
+    /// Histogram of hashed post state transform durations (in seconds)
+    pub(crate) hashed_post_state_transform_duration: Histogram,
+    /// Histogram of update and commit prepare durations (in seconds)
+    pub(crate) update_prepare_duration: Histogram,
+    /// Histogram of update and commit durations (in seconds)
+    pub(crate) update_duration: Histogram,
+
     /// Histogram of hash durations (in seconds)
     pub(crate) hash_duration: Histogram,
     /// Histogram of commit durations (in seconds)
@@ -43,6 +50,18 @@ impl TrieDBMetrics {
 
     pub(crate) fn record_flush_duration(&self, duration: f64) {
         self.flush_duration.record(duration);
+    }
+
+    pub(crate) fn record_hashed_post_state_transform_duration(&self, duration: f64) {
+        self.hashed_post_state_transform_duration.record(duration);
+    }
+
+    pub(crate) fn record_update_prepare_duration(&self, duration: f64) {
+        self.update_prepare_duration.record(duration);
+    }
+
+    pub(crate) fn record_update_duration(&self, duration: f64) {
+        self.update_duration.record(duration);
     }
 }
 
@@ -345,6 +364,8 @@ where
         difflayer: Option<&DiffLayers>, 
         hashed_post_state: &HashedPostState) -> 
         Result<(B256, Option<Arc<DiffLayer>>), TrieDBError> {
+
+        let hashed_post_state_transform_start = Instant::now();
         let mut states: HashMap<alloy_primitives::FixedBytes<32>, Option<StateAccount>> = HashMap::new();
         let mut states_rebuild = HashSet::new();
         let mut storage_states = HashMap::new();
@@ -391,6 +412,8 @@ where
             storage_states.insert(*hashed_address, kvs);
         }
 
+        self.metrics.record_hashed_post_state_transform_duration(hashed_post_state_transform_start.elapsed().as_secs_f64());
+
         let (root_hash, node_set) = self.update_and_commit(
             root_hash, 
             difflayer, 
@@ -421,6 +444,9 @@ where
         states_rebuild: HashSet<B256>,
         storage_states: HashMap<B256, HashMap<B256, Option<U256>>>) -> 
         Result<(B256, Option<Arc<MergedNodeSet>>), TrieDBError> {
+        
+        let update_prepare_start = Instant::now();
+
         // 1. Reset the trie db state
         self.state_at(root_hash, difflayer)?;
 
@@ -463,6 +489,9 @@ where
         }
         self.accounts_with_storage_trie = update_accounts_with_storage.clone();
 
+        self.metrics.record_update_prepare_duration(update_prepare_start.elapsed().as_secs_f64());
+
+        let update_start = Instant::now();
         // 3. Prepare required data to avoid borrowing conflicts for parallel execution
         let db_clone = self.db.clone();
         let difflayer_clone = self.difflayer.as_ref().map(|d| d.clone());
@@ -516,6 +545,7 @@ where
 
         drop(db_clone);
         drop(difflayer_clone);
+        self.metrics.record_update_duration(update_start.elapsed().as_secs_f64());
 
         // 5. Commit the changes
         let (root_hash, node_set) = self.commit(true)?;
