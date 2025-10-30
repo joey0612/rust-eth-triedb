@@ -1838,9 +1838,9 @@ dependencies = [
 
 [[package]]
 name = "op-alloy-consensus"
-version = "0.18.14"
+version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c88d2940558fd69f8f07b3cbd7bb3c02fc7d31159c1a7ba9deede50e7881024"
+checksum = "d9ade20c592484ba1ea538006e0454284174447a3adf9bb59fa99ed512f95493"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -2313,7 +2313,7 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
 name = "reth-metrics"
-version = "1.6.0"
+version = "1.7.0"
 dependencies = [
  "futures",
  "metrics",
@@ -2324,7 +2324,7 @@ dependencies = [
 
 [[package]]
 name = "reth-primitives-traits"
-version = "1.6.0"
+version = "1.7.0"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -2349,7 +2349,7 @@ dependencies = [
 
 [[package]]
 name = "reth-trie-common"
-version = "1.6.0"
+version = "1.7.0"
 dependencies = [
  "alloy-consensus",
  "alloy-primitives",
