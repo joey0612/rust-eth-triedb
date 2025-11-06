@@ -102,7 +102,7 @@ where
     sub_storage_tries: HashMap<B256, StateTrie<DB>>,
 
     pub db: DB,
-    storage_root_cache: Arc<RwLock<LruMap<Vec<u8>, Option<Vec<u8>>, ByLength>>>,
+    // storage_root_cache: Arc<RwLock<LruMap<Vec<u8>, Option<Vec<u8>>, ByLength>>>,
     metrics: TrieDBMetrics,
 }
 
@@ -120,7 +120,7 @@ where
             difflayer: None,
             sub_storage_tries: HashMap::new(),
             db: self.db.clone(),
-            storage_root_cache: self.storage_root_cache.clone(),
+            // storage_root_cache: self.storage_root_cache.clone(),
             metrics: self.metrics.clone()
         }
     }
@@ -142,7 +142,7 @@ where
             difflayer: None,
             sub_storage_tries: HashMap::new(),
             db: db.clone(),
-            storage_root_cache: Arc::new(RwLock::new(LruMap::new(ByLength::new(500_000_000)))),
+            // storage_root_cache: Arc::new(RwLock::new(LruMap::new(ByLength::new(500_000_000)))),
             metrics: TrieDBMetrics::new_with_labels(&[("instance", "default")]),
         }
     }
@@ -280,7 +280,7 @@ where
         for (hashed_address, storage_hash) in storage_hashes {   
             let mut account = self.accounts_with_storage_trie.get(&hashed_address).unwrap().clone();
             account.storage_root = storage_hash;
-            self.storage_root_cache.write().unwrap().insert(hashed_address.as_slice().to_vec(), Some(storage_hash.as_slice().to_vec()));
+            // self.storage_root_cache.write().unwrap().insert(hashed_address.as_slice().to_vec(), Some(storage_hash.as_slice().to_vec()));
             self.update_account_with_hash_state(hashed_address, &account)?;
         }
         // self.storage_tries = storage_tries;
@@ -440,7 +440,7 @@ where
         for (hashed_address, new_account) in states {
             if new_account.is_none() {
                 // if the account is deleted, None is inserted
-                self.storage_root_cache.write().unwrap().insert(hashed_address.as_slice().to_vec(), Some(alloy_trie::KECCAK_EMPTY.as_slice().to_vec()));
+                // self.storage_root_cache.write().unwrap().insert(hashed_address.as_slice().to_vec(), Some(alloy_trie::KECCAK_EMPTY.as_slice().to_vec()));
                 update_accounts.insert(hashed_address, None);
                 continue;
             }
@@ -449,12 +449,12 @@ where
                 // if the account is being rebuilt, use the new account
                 new_account.unwrap()
             }else {
-                let cached_storage_root = self.storage_root_cache.read().unwrap().peek(&hashed_address.as_slice().to_vec()).cloned();
-                if let Some(cached_storage_root) = cached_storage_root {
-                        let mut new_account = new_account.unwrap();
-                        new_account.storage_root = B256::from_slice(cached_storage_root.as_ref().unwrap().as_slice());
-                        new_account
-                } else {
+                // let cached_storage_root = self.storage_root_cache.read().unwrap().peek(&hashed_address.as_slice().to_vec()).cloned();
+                // if let Some(cached_storage_root) = cached_storage_root {
+                //         let mut new_account = new_account.unwrap();
+                //         new_account.storage_root = B256::from_slice(cached_storage_root.as_ref().unwrap().as_slice());
+                //         new_account
+                // } else {
                     get_storage_root_from_trie_count += 1;
                     // if the account is not being rebuilt, use the old account
                     let old_account = self.get_account_with_hash_state(hashed_address)?;           
@@ -471,10 +471,10 @@ where
                             new_account.unwrap()
                         }
                     }
-                }
+                // }
             };
 
-            self.storage_root_cache.write().unwrap().insert(hashed_address.as_slice().to_vec(), Some(final_account.storage_root.as_slice().to_vec()));
+            // self.storage_root_cache.write().unwrap().insert(hashed_address.as_slice().to_vec(), Some(final_account.storage_root.as_slice().to_vec()));
 
             if storage_states.contains_key(&hashed_address) {
                 update_accounts_with_storage.insert(hashed_address, final_account);
@@ -658,7 +658,7 @@ where
         for (hashed_address, new_account) in states {
             if new_account.is_none() {
                 // if the account is deleted, None is inserted
-                self.storage_root_cache.write().unwrap().insert(hashed_address.as_slice().to_vec(), Some(alloy_trie::KECCAK_EMPTY.as_slice().to_vec()));
+                // self.storage_root_cache.write().unwrap().insert(hashed_address.as_slice().to_vec(), Some(alloy_trie::KECCAK_EMPTY.as_slice().to_vec()));
                 update_accounts.insert(hashed_address, None);
                 continue;
             }
@@ -667,12 +667,12 @@ where
                 // if the account is being rebuilt, use the new account
                 new_account.unwrap()
             }else {
-                let cached_storage_root = self.storage_root_cache.read().unwrap().peek(&hashed_address.as_slice().to_vec()).cloned();
-                if let Some(cached_storage_root) = cached_storage_root {
-                        let mut new_account = new_account.unwrap();
-                        new_account.storage_root = B256::from_slice(cached_storage_root.as_ref().unwrap().as_slice());
-                        new_account
-                } else {
+                // let cached_storage_root = self.storage_root_cache.read().unwrap().peek(&hashed_address.as_slice().to_vec()).cloned();
+                // if let Some(cached_storage_root) = cached_storage_root {
+                //         let mut new_account = new_account.unwrap();
+                //         new_account.storage_root = B256::from_slice(cached_storage_root.as_ref().unwrap().as_slice());
+                //         new_account
+                // } else {
                     get_storage_root_from_trie_count += 1;
                     // if the account is not being rebuilt, use the old account
                     let old_account = self.get_account_with_hash_state(hashed_address)?;           
@@ -689,10 +689,10 @@ where
                             new_account.unwrap()
                         }
                     }
-                }
+                // }
             };
 
-            self.storage_root_cache.write().unwrap().insert(hashed_address.as_slice().to_vec(), Some(final_account.storage_root.as_slice().to_vec()));
+            // self.storage_root_cache.write().unwrap().insert(hashed_address.as_slice().to_vec(), Some(final_account.storage_root.as_slice().to_vec()));
             self.metrics.get_storage_root_from_trie.set(get_storage_root_from_trie_count as f64);
             
             if storage_states.contains_key(&hashed_address) {
@@ -820,7 +820,7 @@ where
     }
 
     pub fn clear_cache(&mut self) {
-        self.storage_root_cache.write().unwrap().clear();
+        // self.storage_root_cache.write().unwrap().clear();
         self.db.clear_cache();
     }
 }
