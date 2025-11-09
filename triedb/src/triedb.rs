@@ -1,6 +1,6 @@
 //! Trie database implementation.
 
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, Mutex};
 use std::collections::{HashMap, HashSet};
 use rayon::prelude::*;
 use std::time::Instant;
@@ -101,6 +101,7 @@ where
     // TODO:: different storage_tries
     sub_storage_tries: HashMap<B256, StateTrie<DB>>,
 
+    difflayerManager: DifflayerManager,
     pub db: DB,
     // storage_root_cache: Arc<RwLock<LruMap<Vec<u8>, Option<Vec<u8>>, ByLength>>>,
     metrics: TrieDBMetrics,
@@ -120,6 +121,7 @@ where
             difflayer: None,
             sub_storage_tries: HashMap::new(),
             db: self.db.clone(),
+            difflayerManager: self.difflayerManager.clone(),
             // storage_root_cache: self.storage_root_cache.clone(),
             metrics: self.metrics.clone()
         }
@@ -142,6 +144,7 @@ where
             difflayer: None,
             sub_storage_tries: HashMap::new(),
             db: db.clone(),
+            difflayerManager: DifflayerManager::default(),
             // storage_root_cache: Arc::new(RwLock::new(LruMap::new(ByLength::new(500_000_000)))),
             metrics: TrieDBMetrics::new_with_labels(&[("instance", "default")]),
         }
@@ -823,6 +826,37 @@ where
         // self.storage_root_cache.write().unwrap().clear();
         self.db.clear_cache();
     }
+
+    pub fn add_difflayer(&mut self, parent_hash: B256, block_hash: B256, difflayer: Arc<DiffLayer>) {
+        self.difflayerManager.add_difflayer(parent_hash, block_hash, difflayer);
+    }
+
+    pub fn get_difflayers(&self, block_hash: B256) -> Option<DiffLayers> {
+        self.difflayerManager.get_difflayers(block_hash)
+    }
+
+    pub fn flush_by_difflayer_maanager(&mut self, block_number: u64, state_root: B256, block_hash: B256) -> Result<(), TrieDBError> {
+        let flush_start = Instant::now();
+        let difflayer = self.difflayerManager.consume_difflayer(block_hash);
+
+        for (key, node) in difflayer.as_ref() {
+            if node.is_deleted() {
+                self.db.remove(&key);
+            } else {
+                self.db.insert(&key, node.blob.as_ref().unwrap().clone())
+                    .map_err(|e| TrieDBError::Database(format!("Failed to insert node: {:?}", e)))?;
+            }
+        }
+        
+        self.db.insert(TRIE_STATE_ROOT_KEY, state_root.as_slice().to_vec())
+            .map_err(|e| TrieDBError::Database(format!("Failed to insert state root: {:?}", e)))?;
+        self.db.insert(TRIE_STATE_BLOCK_NUMBER_KEY, block_number.to_le_bytes().to_vec())
+            .map_err(|e| TrieDBError::Database(format!("Failed to insert block number: {:?}", e)))?;
+        
+        self.metrics.record_flush_duration(flush_start.elapsed().as_secs_f64());
+        Ok(())
+    }
+
 }
 
 
@@ -840,5 +874,49 @@ where
             .field("difflayer", &self.difflayer.as_ref().map(|_| "<Difflayer>"))
             .field("db", &format!("<{}>", std::any::type_name::<DB>()))
             .finish()
+    }
+}
+
+
+#[derive(Clone, Debug)]
+pub struct DifflayerManager  {
+    /// Thread-safe HashMap for difflayers
+    pub(crate) difflayers: Arc<Mutex<HashMap<B256, Arc<DiffLayer>>>>,
+    /// Thread-safe HashMap for difflayers chain
+    pub(crate) difflayers_chain: Arc<Mutex<HashMap<B256, B256>>>,
+}
+
+impl Default for DifflayerManager {
+    fn default() -> Self {
+        Self {
+            difflayers: Arc::new(Mutex::new(HashMap::new())),
+            difflayers_chain: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+}
+
+impl DifflayerManager {
+    pub fn add_difflayer(&self, parent_hash: B256, block_hash: B256, difflayer: Arc<DiffLayer>) {
+        self.difflayers.lock().unwrap().insert(block_hash, difflayer);
+        self.difflayers_chain.lock().unwrap().insert(block_hash, parent_hash);
+    }
+
+    pub fn get_difflayers(&self, block_hash: B256) -> Option<DiffLayers> {
+        let mut difflayers = DiffLayers::new();
+        let mut current_hash = block_hash;
+        while let Some(parent_hash) = self.difflayers_chain.lock().unwrap().get(&current_hash) {
+            difflayers.push(self.difflayers.lock().unwrap().get(parent_hash).unwrap().clone());
+            current_hash = *parent_hash;
+        }
+        if difflayers.is_empty() {
+            return None;
+        }
+        Some(difflayers)
+    }
+
+    pub fn consume_difflayer(&self, block_hash: B256) -> Arc<DiffLayer> {
+        let difflayer = self.difflayers.lock().unwrap().remove(&block_hash).unwrap();
+        self.difflayers_chain.lock().unwrap().remove(&block_hash);
+        difflayer
     }
 }
