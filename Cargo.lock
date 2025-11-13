@@ -2530,7 +2530,6 @@ dependencies = [
 name = "rust-eth-triedb-pathdb"
 version = "0.1.0"
 dependencies = [
- "alloy-primitives",
  "metrics",
  "reth-metrics",
  "rocksdb",
@@ -2570,6 +2569,7 @@ dependencies = [
  "reth-metrics",
  "rocksdb",
  "rust-eth-triedb-common",
+ "rust-eth-triedb-state-trie",
  "schnellru",
  "tempfile",
  "thiserror 1.0.69",

@@ -10,6 +10,7 @@ use schnellru::{ByLength, LruMap};
 use tracing::{error, trace, warn};
 
 use alloy_primitives::B256;
+use rust_eth_triedb_state_trie::encoding::{TRIE_STATE_BLOCK_NUMBER_KEY, TRIE_STATE_ROOT_KEY};
 
 use crate::traits::*;
 
@@ -378,19 +379,20 @@ impl SnapshotDB {
         }
     }
 
-    pub fn bacth_insert_storage_root(&self, storage_roots: HashMap<B256, B256>) -> PathProviderResult<()> {
-        
-        if storage_roots.is_empty() {
-            return Ok(());
-        }
-
+    pub fn bacth_insert_storage_root(&self, block_number: u64, state_root: B256, storage_roots: HashMap<B256, B256>) -> PathProviderResult<()> {
         let count = storage_roots.len();
-        let keys: Vec<B256> = storage_roots.keys().cloned().collect();
         let mut batch = WriteBatch::default();
         
-        // Update cache first
+        // Update cache first and prepare batch
         {
             let mut cache = self.cache.lock().unwrap();
+            
+            // Insert state root and block number (only once, not in loop)
+            let state_root_bytes = state_root.as_slice();
+            cache.insert(TRIE_STATE_ROOT_KEY.to_vec(), Some(state_root_bytes.to_vec()));
+            cache.insert(TRIE_STATE_BLOCK_NUMBER_KEY.to_vec(), Some(block_number.to_le_bytes().to_vec()));
+            batch.put(TRIE_STATE_ROOT_KEY, state_root_bytes);
+            batch.put(TRIE_STATE_BLOCK_NUMBER_KEY, &block_number.to_le_bytes());
             
             for (key, value) in storage_roots {
                 let key_bytes = key.as_slice();
@@ -408,11 +410,6 @@ impl SnapshotDB {
             }
             Err(e) => {
                 error!(target: "snapshotdb::rocksdb", "Error putting {} key-value pairs: {}", count, e);
-                // Remove from cache on error
-                let mut cache = self.cache.lock().unwrap();
-                for key in keys {
-                    cache.remove(key.as_slice());
-                }
                 Err(PathProviderError::Database(format!("RocksDB put_multi error: {}", e)))
             }
         }

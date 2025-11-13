@@ -30,10 +30,12 @@ mod tests {
         // Insert a storage root using batch_insert
         let hash_address = B256::from([0x01; 32]);
         let storage_root = B256::from([0x02; 32]);
+        let state_root = B256::from([0x03; 32]);
+        let block_number = 100u64;
         let mut storage_roots = HashMap::new();
         storage_roots.insert(hash_address, storage_root);
 
-        db.bacth_insert_storage_root(storage_roots).unwrap();
+        db.bacth_insert_storage_root(block_number, state_root, storage_roots).unwrap();
 
         // Retrieve it
         let result = db.get_storage_root(hash_address).unwrap();
@@ -47,8 +49,10 @@ mod tests {
         let db = SnapshotDB::new(db_path.to_str().unwrap(), PathProviderConfig::default()).unwrap();
 
         // Test with empty HashMap
+        let state_root = B256::from([0x03; 32]);
+        let block_number = 100u64;
         let storage_roots = HashMap::new();
-        let result = db.bacth_insert_storage_root(storage_roots);
+        let result = db.bacth_insert_storage_root(block_number, state_root, storage_roots);
         assert!(result.is_ok());
     }
 
@@ -61,10 +65,12 @@ mod tests {
         // Insert a single storage root
         let hash_address = B256::from([0x10; 32]);
         let storage_root = B256::from([0x20; 32]);
+        let state_root = B256::from([0x30; 32]);
+        let block_number = 200u64;
         let mut storage_roots = HashMap::new();
         storage_roots.insert(hash_address, storage_root);
 
-        let result = db.bacth_insert_storage_root(storage_roots);
+        let result = db.bacth_insert_storage_root(block_number, state_root, storage_roots);
         assert!(result.is_ok());
 
         // Verify it was inserted
@@ -81,6 +87,8 @@ mod tests {
         // Insert multiple storage roots
         let mut storage_roots = HashMap::new();
         let mut expected_results = HashMap::new();
+        let state_root = B256::from([0x40; 32]);
+        let block_number = 300u64;
 
         for i in 0..10 {
             let mut hash_bytes = [0u8; 32];
@@ -95,7 +103,7 @@ mod tests {
             expected_results.insert(hash_address, storage_root);
         }
 
-        let result = db.bacth_insert_storage_root(storage_roots);
+        let result = db.bacth_insert_storage_root(block_number, state_root, storage_roots);
         assert!(result.is_ok());
 
         // Verify all were inserted correctly
@@ -118,12 +126,15 @@ mod tests {
         let hash_address2 = B256::from([0xCC; 32]);
         let storage_root2 = B256::from([0xDD; 32]);
 
+        let state_root = B256::from([0xEE; 32]);
+        let block_number = 400u64;
+
         let mut storage_roots = HashMap::new();
         storage_roots.insert(hash_address1, storage_root1);
         storage_roots.insert(hash_address2, storage_root2);
 
         // Insert
-        db.bacth_insert_storage_root(storage_roots).unwrap();
+        db.bacth_insert_storage_root(block_number, state_root, storage_roots).unwrap();
 
         // Retrieve and verify
         let result1 = db.get_storage_root(hash_address1).unwrap();

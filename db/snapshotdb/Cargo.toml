@@ -16,6 +16,7 @@ jemalloc-prof = ["tikv-jemallocator?/profiling"]
 [dependencies]
 # reth
 rust-eth-triedb-common.workspace = true
+rust-eth-triedb-state-trie.workspace = true
 
 # alloy
 alloy-primitives = { workspace = true, features = ["asm-keccak"] }
