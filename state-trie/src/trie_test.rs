@@ -1785,7 +1785,7 @@ fn test_hash_slice_explanation() {
 
 #[test]
 fn test_key_to_nibbles_bsc_compatibility() {
-    use rust_eth_triedb_memorydb::MemoryDB;
+    use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
     use crate::trie::Trie;
     use alloy_primitives::hex;
 
@@ -1793,7 +1793,11 @@ fn test_key_to_nibbles_bsc_compatibility() {
     println!("🧪 Testing key_to_nibbles BSC compatibility...");
 
     // Create a trie instance to test the method
-    let db = MemoryDB::new();
+    let temp_dir = env::temp_dir().join("trie_test_key_to_nibbles");
+    let db_path = temp_dir.to_str().unwrap();
+    let config = PathProviderConfig::default();
+    let db = PathDB::new(db_path, config)
+        .expect("Failed to create PathDB");
     let trie_id = crate::SecureTrieId::default();
     let _trie = Trie::new(&trie_id, db, None).expect("Failed to create trie");
 
@@ -1880,15 +1884,19 @@ fn test_key_to_nibbles_bsc_compatibility() {
 
 #[test]
 fn test_update_and_get_storage_basic() {
-    use rust_eth_triedb_memorydb::MemoryDB;
+    use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
     use crate::state_trie::StateTrie;
     use crate::secure_trie::SecureTrieId;
     use alloy_primitives::{Address, B256};
 
-    // Create empty in-memory DB and StateTrie
-    let db = MemoryDB::default();
+    // Create PathDB and StateTrie
+    let temp_dir = env::temp_dir().join("trie_test_storage_basic");
+    let db_path = temp_dir.to_str().unwrap();
+    let config = PathProviderConfig::default();
+    let db = PathDB::new(db_path, config)
+        .expect("Failed to create PathDB");
     let id = SecureTrieId::new(B256::ZERO);
-    let mut state_trie: StateTrie<MemoryDB> = StateTrie::new(id, db, None).expect("create trie");
+    let mut state_trie: StateTrie<PathDB> = StateTrie::new(id, db, None).expect("create trie");
 
     let address = Address::ZERO;
     let key = b"storage_key";
@@ -1904,14 +1912,18 @@ fn test_update_and_get_storage_basic() {
 
 #[test]
 fn test_update_and_get_storage_various_sizes() {
-    use rust_eth_triedb_memorydb::MemoryDB;
+    use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
     use crate::state_trie::StateTrie;
     use crate::secure_trie::SecureTrieId;
     use alloy_primitives::{Address, B256};
 
-    let db = MemoryDB::default();
+    let temp_dir = env::temp_dir().join("trie_test_storage_sizes");
+    let db_path = temp_dir.to_str().unwrap();
+    let config = PathProviderConfig::default();
+    let db = PathDB::new(db_path, config)
+        .expect("Failed to create PathDB");
     let id = SecureTrieId::new(B256::ZERO);
-    let mut trie: StateTrie<MemoryDB> = StateTrie::new(id, db, None).expect("create trie");
+    let mut trie: StateTrie<PathDB> = StateTrie::new(id, db, None).expect("create trie");
 
     let addr = Address::ZERO;
     let key = b"size_key";

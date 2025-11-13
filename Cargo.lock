@@ -2527,19 +2527,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rust-eth-triedb-memorydb"
-version = "0.1.0"
-dependencies = [
- "alloy-primitives",
- "auto_impl",
- "parking_lot",
- "pretty_assertions",
- "rust-eth-triedb-common",
- "thiserror 1.0.69",
- "tikv-jemallocator",
-]
-
-[[package]]
 name = "rust-eth-triedb-pathdb"
 version = "0.1.0"
 dependencies = [
@@ -2588,7 +2575,6 @@ dependencies = [
  "rand 0.8.5",
  "rayon",
  "rust-eth-triedb-common",
- "rust-eth-triedb-memorydb",
  "rust-eth-triedb-pathdb",
  "tempfile",
  "thiserror 1.0.69",

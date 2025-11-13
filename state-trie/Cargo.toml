@@ -14,7 +14,6 @@ workspace = true
 [dependencies]
 # reth
 # reth-primitives-traits.workspace = true
-rust-eth-triedb-memorydb.workspace = true
 rust-eth-triedb-pathdb.workspace = true
 rust-eth-triedb-common.workspace = true
 
