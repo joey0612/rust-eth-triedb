@@ -2,6 +2,7 @@
 members = [
     "common",
     "db/pathdb",
+    "db/snapshotdb",
     "state-trie",
     "smoke-test",
     "triedb",
@@ -37,6 +38,7 @@ tempfile = "3.8"
 tikv-jemallocator = "0.6"
 rust-eth-triedb-common = { version = "0.1.0", path = "common" }
 rust-eth-triedb-pathdb = { version = "0.1.0", path = "db/pathdb" }
+rust-eth-triedb-snapshotdb = { version = "0.1.0", path = "db/snapshotdb" }
 rust-eth-triedb-state-trie = { version = "0.1.0", path = "state-trie" }
 
 # reth

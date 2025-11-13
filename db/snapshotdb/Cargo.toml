@@ -1,0 +1,55 @@
+[package]
+name = "rust-eth-triedb-snapshotdb"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+description = "SnapshotDB implementation for RocksDB integration"
+
+[features]
+default = []
+jemalloc = ["tikv-jemallocator"]
+jemalloc-prof = ["tikv-jemallocator?/profiling"]
+
+[dependencies]
+# reth
+rust-eth-triedb-common.workspace = true
+
+# alloy
+alloy-primitives = { workspace = true, features = ["asm-keccak"] }
+
+# RocksDB
+rocksdb = { workspace = true, features = ["multi-threaded-cf", "io-uring", "jemalloc"] }
+
+# Error handling
+thiserror.workspace = true
+
+# Logging
+tracing.workspace = true
+
+# LRU Cache
+schnellru.workspace = true
+
+# Testing
+tempfile.workspace = true
+
+# reth
+reth-metrics = { workspace = true, features = ["common"] }
+
+# metrics (required by reth-metrics derive macro)
+metrics.workspace = true
+
+# Jemalloc support
+tikv-jemallocator = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[profile.maxperf]
+inherits = "release"
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+

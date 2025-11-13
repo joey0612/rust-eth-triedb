@@ -2562,6 +2562,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "rust-eth-triedb-snapshotdb"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives",
+ "metrics",
+ "reth-metrics",
+ "rocksdb",
+ "rust-eth-triedb-common",
+ "schnellru",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tikv-jemallocator",
+ "tracing",
+]
+
+[[package]]
 name = "rust-eth-triedb-state-trie"
 version = "0.1.0"
 dependencies = [
