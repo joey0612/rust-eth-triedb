@@ -53,7 +53,7 @@ where
         batch.insert(TRIE_STATE_BLOCK_NUMBER_KEY, block_number.to_le_bytes().to_vec()).unwrap();
         
         if let Some(difflayer) = update_nodes {
-            for (key, node) in difflayer.as_ref() {
+            for (key, node) in difflayer.diff_nodes.iter() {
                 if node.is_deleted() {
                     batch.delete(key).unwrap();
                 } else {

@@ -4,7 +4,7 @@ use std::str::FromStr;
 use alloy_primitives::{keccak256, Address, B256, U256};
 use alloy_trie::{EMPTY_ROOT_HASH};
 use rust_eth_triedb_state_trie::account::StateAccount;
-use rust_eth_triedb_state_trie::node::{MergedNodeSet, init_empty_root_node};
+use rust_eth_triedb_state_trie::node::{MergedNodeSet, DiffLayer, DiffLayers, init_empty_root_node};
 use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
 // use rust_eth_triedb_snapshotdb::{SnapshotDB, PathProviderConfig as SnapshotPathProviderConfig};
 use crate::{TrieDB, TrieDBError};
@@ -132,7 +132,8 @@ fn test_update_all_initial(triedb: &mut TrieDB<PathDB>) -> Result<(B256, Option<
 
             // Call flush and print hash
             if let Some(nodes) = node_set {
-                let difflayer = nodes.to_difflayer();
+                let diff_nodes = (*nodes.to_diff_nodes()).clone();
+                let difflayer = Arc::new(DiffLayer::new(diff_nodes, HashMap::new()));
                 let flush_result = triedb.flush(0, B256::ZERO, &Some(difflayer));
                 match flush_result {
                     Ok(()) => println!("flush executed successfully"),
@@ -195,8 +196,10 @@ fn test_update_all_modifications(root_hash: B256, difflayer: Option<Arc<MergedNo
     println!("Preparing to update {} storage states", storage_states.len());
     
     let difflayers = if let Some(d) = difflayer.as_ref() {
-        let difflayer = d.to_difflayer();
-        Some(vec![difflayer])
+        let diff_nodes = (*d.to_diff_nodes()).clone();
+        let mut difflayers = DiffLayers::default();
+        difflayers.insert_difflayer(Arc::new(DiffLayer::new(diff_nodes, HashMap::new())));
+        Some(difflayers)
     } else {
         None
     };
@@ -228,7 +231,8 @@ fn test_update_all_modifications(root_hash: B256, difflayer: Option<Arc<MergedNo
                 }
                 println!("✅ NodeSet signature assertion passed: matches BSC implementation");
                 
-                let difflayer = node_sets.to_difflayer();
+                let diff_nodes = (*node_sets.to_diff_nodes()).clone();
+                let difflayer = Arc::new(DiffLayer::new(diff_nodes, HashMap::new()));
                 // Call flush and print hash
                 let flush_result = triedb.flush(0, B256::ZERO, &Some(difflayer));
                 match flush_result {
@@ -376,7 +380,8 @@ fn test_multiple_accounts_update() {
     ).unwrap();
 
     if let Some(merged_node_set) = merged_node_set {
-        let difflayer = merged_node_set.to_difflayer();
+        let diff_nodes = (*merged_node_set.to_diff_nodes()).clone();
+        let difflayer = Arc::new(DiffLayer::new(diff_nodes, HashMap::new()));
         triedb.flush(0, root_hash, &Some(difflayer)).unwrap();
     }
 

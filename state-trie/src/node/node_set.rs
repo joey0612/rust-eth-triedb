@@ -250,9 +250,73 @@ impl std::fmt::Debug for NodeSet {
 }
 
 /// Alias for difflayer node mapping
-pub type DiffLayer = HashMap<Vec<u8>, Arc<TrieNode>>;
+// pub type DiffLayer = HashMap<Vec<u8>, Arc<TrieNode>>;
 
-pub type DiffLayers = Vec<Arc<DiffLayer>>;
+// pub type DiffLayers = Vec<Arc<DiffLayer>>;
+
+
+/// DiffLayer is a collection of updates nodes and storage roots for a given block
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct DiffLayer {
+    pub diff_nodes: HashMap<Vec<u8>, Arc<TrieNode>>,
+    pub diff_storage_roots: HashMap<B256, B256>,
+}
+
+impl DiffLayer {
+    /// Create a new diff layer
+    pub fn new(diff_nodes: HashMap<Vec<u8>, Arc<TrieNode>>, diff_storage_roots: HashMap<B256, B256>) -> Self {
+        Self { diff_nodes, diff_storage_roots }
+    }
+
+    /// Get a trie node by prefix
+    pub fn get_trie_nodes(&self, prefix: Vec<u8>) -> Option<Arc<TrieNode>> {
+        self.diff_nodes.get(&prefix).map(|node: &Arc<TrieNode>| node.clone())
+    }
+
+    /// Get a storage root by hased address
+    pub fn get_storage_roots(&self, hased_address: B256) -> Option<B256> {
+        self.diff_storage_roots.get(&hased_address).map(|root| *root)
+    }
+}
+
+
+/// DiffLayers is a collection of diff layers for uncommitted blocks
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct DiffLayers {
+    pub diff_layers: Vec<Arc<DiffLayer>>,
+}
+
+impl DiffLayers {
+    /// Insert a diff layer into the collection
+    pub fn insert_difflayer(&mut self, difflayer: Arc<DiffLayer>) {
+        self.diff_layers.push(difflayer);
+    }
+
+    /// Get a trie node by prefix
+    pub fn get_trie_nodes(&self, prefix: Vec<u8>) -> Option<Arc<TrieNode>> {
+        for difflayer in &self.diff_layers {
+            if let Some(node) = difflayer.get_trie_nodes(prefix.clone()) {
+                return Some(node);
+            }
+        }
+        None
+    }
+
+    /// Get a storage root by hased address
+    pub fn get_storage_roots(&self, hased_address: B256) -> Option<B256> {
+        for difflayer in &self.diff_layers {
+            if let Some(root) = difflayer.get_storage_roots(hased_address) {
+                return Some(root);
+            }
+        }
+        None
+    }
+
+    /// Returns true if the diff layers are empty
+    pub fn is_empty(&self) -> bool {
+        self.diff_layers.is_empty()
+    }
+}
 
 /// MergedNodeSet is a set of node sets that are merged together.
 #[derive(Debug, Clone)]
@@ -279,8 +343,8 @@ impl MergedNodeSet {
     }
 
     /// Convert the merged node set to a difflayer
-    pub fn to_difflayer(&self) -> Arc<DiffLayer> {
-        let mut difflayer = DiffLayer::new();
+    pub fn to_diff_nodes(&self) -> Arc<HashMap<Vec<u8>, Arc<TrieNode>>> {
+        let mut difflayer = HashMap::new();
         for (owner, set) in &self.sets {
             for (path, node) in &set.nodes {
                 if owner == &B256::ZERO {

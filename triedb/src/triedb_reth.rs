@@ -127,7 +127,9 @@ where
             storage_states)?;
 
         if let Some(node_set) = node_set {
-            let difflayer = node_set.to_difflayer();
+            // let difflayer = node_set.to_difflayer();
+            let diff_nodes = (*node_set.to_diff_nodes()).clone();
+            let difflayer = Arc::new(DiffLayer::new(diff_nodes, HashMap::new()));
             return Ok((root_hash, Some(difflayer)));
         } 
         Ok((root_hash, None))
