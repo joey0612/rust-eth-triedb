@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use alloy_primitives::B256;
-use rust_eth_triedb_common::TrieDatabase;
+use rust_eth_triedb_common::{TrieDatabase, TrieDatabaseBatch};
 use rust_eth_triedb_state_trie::node::DiffLayer;
 use rust_eth_triedb_state_trie::encoding::{TRIE_STATE_ROOT_KEY, TRIE_STATE_BLOCK_NUMBER_KEY};
 
@@ -17,10 +17,10 @@ where
     DB::Error: std::fmt::Debug,
 {
     pub fn latest_persist_state(&self) -> Result<(u64, B256), TrieDBError> {
-        let block_number_bytes = self.db.get(TRIE_STATE_BLOCK_NUMBER_KEY)
+        let block_number_bytes = self.path_db.get(TRIE_STATE_BLOCK_NUMBER_KEY)
             .map_err(|e| TrieDBError::Database(format!("Failed to get block number: {:?}", e)))?
             .ok_or_else(|| TrieDBError::Database("Block number not found".to_string()))?;
-        let state_root_bytes = self.db.get(TRIE_STATE_ROOT_KEY)
+        let state_root_bytes = self.path_db.get(TRIE_STATE_ROOT_KEY)
             .map_err(|e| TrieDBError::Database(format!("Failed to get state root: {:?}", e)))?
             .ok_or_else(|| TrieDBError::Database("State root not found".to_string()))?;
         
@@ -39,28 +39,37 @@ where
     pub fn flush(&mut self, block_number: u64, state_root: B256, update_nodes: &Option<Arc<DiffLayer>>) -> Result<(), TrieDBError> {
         let flush_start = Instant::now();
 
+        self.flush_trie_nodes(block_number, state_root, update_nodes)?;
+        self.metrics.record_flush_duration(flush_start.elapsed().as_secs_f64());
+        Ok(())
+    }
+
+
+    pub fn flush_trie_nodes(&mut self, block_number: u64, state_root: B256, update_nodes: &Option<Arc<DiffLayer>>) -> Result<(), TrieDBError> {
+        
+        let mut batch = self.path_db.create_batch().unwrap();
+        
+        batch.insert(TRIE_STATE_ROOT_KEY, state_root.as_slice().to_vec()).unwrap();
+        batch.insert(TRIE_STATE_BLOCK_NUMBER_KEY, block_number.to_le_bytes().to_vec()).unwrap();
+        
         if let Some(difflayer) = update_nodes {
             for (key, node) in difflayer.as_ref() {
                 if node.is_deleted() {
-                    self.db.remove(&key);
+                    batch.delete(key).unwrap();
                 } else {
-                    self.db.insert(&key, node.blob.as_ref().unwrap().clone())
-                        .map_err(|e| TrieDBError::Database(format!("Failed to insert node: {:?}", e)))?;
+                    batch.insert(key, node.blob.as_ref().unwrap().clone()).unwrap();
                 }
             }
         }
-        self.db.insert(TRIE_STATE_ROOT_KEY, state_root.as_slice().to_vec())
-            .map_err(|e| TrieDBError::Database(format!("Failed to insert state root: {:?}", e)))?;
-        self.db.insert(TRIE_STATE_BLOCK_NUMBER_KEY, block_number.to_le_bytes().to_vec())
-            .map_err(|e| TrieDBError::Database(format!("Failed to insert block number: {:?}", e)))?;
-        
-        self.metrics.record_flush_duration(flush_start.elapsed().as_secs_f64());
+
+        self.path_db.batch_commit(batch).map_err(|e| TrieDBError::Database(format!("Failed to commit batch: {:?}, block number: {}", e, block_number)))?;
+
         Ok(())
     }
 
     pub fn clear_cache(&mut self) {
         // self.storage_root_cache.write().unwrap().clear();
-        self.db.clear_cache();
+        self.path_db.clear_cache();
     }
 }
 

@@ -150,7 +150,7 @@ where
         let storage_root = self.get_storage_root_with_hash_state(hashed_address)?;
         let id = SecureTrieId::new(storage_root)
             .with_owner(hashed_address);
-        let storage_trie = SecureTrieBuilder::new(self.db.clone())
+        let storage_trie = SecureTrieBuilder::new(self.path_db.clone())
             .with_id(id)
             .build_with_difflayer(self.difflayer.as_ref())?;
 

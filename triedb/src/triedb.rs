@@ -43,7 +43,7 @@ where
     // TODO:: different storage_tries
     pub(crate) sub_storage_tries: HashMap<B256, StateTrie<DB>>,
 
-    pub db: DB,
+    pub path_db: DB,
     // storage_root_cache: Arc<RwLock<LruMap<Vec<u8>, Option<Vec<u8>>, ByLength>>>,
     pub(crate) metrics: TrieDBMetrics,
 }
@@ -55,7 +55,7 @@ where
     DB::Error: std::fmt::Debug,
 {
     /// Creates a new trie database
-    pub fn new(db: DB) -> Self {
+    pub fn new(path_db: DB) -> Self {
         Self {
             root_hash: EMPTY_ROOT_HASH,
             account_trie: None,
@@ -63,7 +63,7 @@ where
             accounts_with_storage_trie: HashMap::new(),
             difflayer: None,
             sub_storage_tries: HashMap::new(),
-            db: db.clone(),
+            path_db: path_db.clone(),
             metrics: TrieDBMetrics::new_with_labels(&[("instance", "default")]),
         }
     }
@@ -72,7 +72,7 @@ where
     pub fn state_at(&mut self, root_hash: B256, difflayer: Option<&DiffLayers>) -> Result<(), TrieDBError> {
         let id = SecureTrieId::new(root_hash);
         self.account_trie = Some(
-            SecureTrieBuilder::new(self.db.clone())
+            SecureTrieBuilder::new(self.path_db.clone())
             .with_id(id)
             .build_with_difflayer(difflayer)?
         );
@@ -85,8 +85,8 @@ where
     }
 
     /// Gets a mutable reference to the database
-    pub fn get_mut_db_ref(&mut self) -> &mut DB {
-        &mut self.db
+    pub fn get_mut_path_db_ref(&mut self) -> &mut DB {
+        &mut self.path_db
     }
 
     /// Clean the trie db
@@ -113,7 +113,7 @@ where
             accounts_with_storage_trie: HashMap::new(),
             difflayer: None,
             sub_storage_tries: HashMap::new(),
-            db: self.db.clone(),
+            path_db: self.path_db.clone(),
             metrics: self.metrics.clone()
         }
     }

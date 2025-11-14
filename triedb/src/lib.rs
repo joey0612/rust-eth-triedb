@@ -7,7 +7,7 @@ pub mod triedb;
 pub mod triedb_basic;
 pub mod triedb_manager;
 pub mod triedb_metrics;
-pub mod triedb_pathdb;
+pub mod triedb_disk;
 pub mod triedb_reth;
 
 #[cfg(test)]

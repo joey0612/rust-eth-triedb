@@ -211,7 +211,7 @@ where
 
         let update_start = Instant::now();
         // 3. Prepare required data to avoid borrowing conflicts for parallel execution
-        let db_clone = self.db.clone();
+        let path_db_clone = self.path_db.clone();
         let difflayer_clone = self.difflayer.as_ref().map(|d| d.clone());
 
         // 4. Parallel execution: update accounts and storage simultaneously
@@ -241,7 +241,7 @@ where
 
                         let id = SecureTrieId::new(storage_root)
                             .with_owner(hashed_address);
-                        let mut storage_trie = SecureTrieBuilder::new(db_clone.clone())
+                        let mut storage_trie = SecureTrieBuilder::new(path_db_clone.clone())
                             .with_id(id)
                             .build_with_difflayer(difflayer_clone.as_ref()).unwrap();
 
@@ -262,7 +262,7 @@ where
         self.sub_storage_tries = update_storage;
         // self.storage_tries = update_storage;
 
-        drop(db_clone);
+        drop(path_db_clone);
         drop(difflayer_clone);
         self.metrics.record_update_duration(update_start.elapsed().as_secs_f64());
 

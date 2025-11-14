@@ -10,7 +10,7 @@ use schnellru::{ByLength, LruMap};
 use tracing::{error, trace, warn};
 
 use crate::traits::*;
-use rust_eth_triedb_common::TrieDatabase;
+use rust_eth_triedb_common::{TrieDatabase, TrieDatabaseBatch};
 
 use reth_metrics::{
     metrics::{Counter},
@@ -30,15 +30,15 @@ pub(crate) struct PathDBMetrics {
 /// PathDB implementation using RocksDB.
 pub struct PathDB {
     /// The underlying RocksDB instance.
-    db: Arc<DB>,
+    pub db: Arc<DB>,
     /// Configuration for the database.
-    config: PathProviderConfig,
+    pub config: PathProviderConfig,
     /// Write options for batch operations.
-    write_options: WriteOptions,
+    pub write_options: WriteOptions,
     /// Read options for read operations.
-    read_options: ReadOptions,
+    pub read_options: ReadOptions,
     /// LRU cache for key-value pairs.
-    cache: Arc<Mutex<LruMap<Vec<u8>, Option<Vec<u8>>, ByLength>>>,
+    pub cache: Arc<Mutex<LruMap<Vec<u8>, Option<Vec<u8>>, ByLength>>>,
     /// Metrics for the PathDB.
     metrics: PathDBMetrics,
 }
@@ -364,6 +364,7 @@ impl PathProviderManager for PathDB {
 
 impl TrieDatabase for PathDB {
     type Error = PathProviderError;
+    type Batch = PathDBBatch;
 
     fn get(&self, path: &[u8]) -> Result<Option<Vec<u8>>, Self::Error> {
         self.get_raw(path)
@@ -383,5 +384,86 @@ impl TrieDatabase for PathDB {
 
     fn clear_cache(&self) {
         self.clear_cache();
+    }
+
+    fn create_batch(&self) -> Result<Self::Batch, Self::Error> {
+        Ok(PathDBBatch::new())
+    }
+
+    fn batch_commit(&self, batch: Self::Batch) -> Result<(), Self::Error> {
+        match self.db.write_opt(batch.batch, &self.write_options) {
+            Ok(()) => {
+                {
+                    // Update cache with batch operations
+                    let mut cache = self.cache.lock().unwrap();
+                    for (key, value) in &batch.operations {
+                        match value {
+                            Some(val) => {
+                                // Insert or update operation
+                                cache.insert(key.clone(), Some(val.clone()));
+                            }
+                            None => {
+                                // Delete operation
+                                cache.remove(key);
+                            }
+                        }
+                    }
+                }
+                trace!(target: "pathdb::batch", "Successfully committed batch to database");
+                Ok(())
+            }
+            Err(e) => {
+                error!(target: "pathdb::batch", "Error committing batch: {}", e);
+                Err(PathProviderError::Database(format!("Batch commit error: {}", e)))
+            }
+        }
+    }
+}
+
+// PathDB batch implementation using RocksDB WriteBatch
+pub struct PathDBBatch {
+    /// The underlying RocksDB WriteBatch
+    pub batch: WriteBatch,
+    /// Track operations for cache updates
+    operations: Vec<(Vec<u8>, Option<Vec<u8>>)>, // (key, value) where None means delete
+}
+
+impl PathDBBatch {
+    /// Create a new PathDB batch
+    pub fn new() -> Self {
+        Self {
+            batch: WriteBatch::default(),
+            operations: Vec::new(),
+        }
+    }
+}
+
+impl TrieDatabaseBatch for PathDBBatch {
+    type Error = PathProviderError;
+
+    fn insert(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Self::Error> {
+        self.batch.put(key, &value);
+        self.operations.push((key.to_vec(), Some(value)));
+        Ok(())
+    }
+
+    fn delete(&mut self, key: &[u8]) -> Result<(), Self::Error> {
+        self.batch.delete(key);
+        self.operations.push((key.to_vec(), None));
+        Ok(())
+    }
+
+    fn is_empty(&self) -> bool {
+        self.batch.is_empty()
+    }
+
+    fn len(&self) -> usize {
+        self.batch.len()
+    }
+
+    fn clear(&mut self) -> Result<(), Self::Error> {
+        self.batch.clear();
+        self.operations.clear();
+        Ok(())
     }
 }
