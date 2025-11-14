@@ -40,10 +40,6 @@ where
     pub(crate) storage_tries: HashMap<B256, StateTrie<DB>>,
     pub(crate) accounts_with_storage_trie: HashMap<B256, StateAccount>,
     pub(crate) difflayer: Option<DiffLayers>,
-
-    // TODO:: different storage_tries
-    pub(crate) sub_storage_tries: HashMap<B256, StateTrie<DB>>,
-
     pub path_db: DB,
     pub snap_db: SnapshotDB,
     pub(crate) metrics: TrieDBMetrics,
@@ -63,7 +59,6 @@ where
             storage_tries: HashMap::new(),
             accounts_with_storage_trie: HashMap::new(),
             difflayer: None,
-            sub_storage_tries: HashMap::new(),
             path_db: path_db.clone(),
             snap_db: snap_db.clone(),
             metrics: TrieDBMetrics::new_with_labels(&[("instance", "default")]),
@@ -81,7 +76,6 @@ where
         self.root_hash = root_hash;
         self.difflayer = difflayer.map(|d| d.clone());
         self.storage_tries.clear();
-        self.sub_storage_tries.clear();
         self.accounts_with_storage_trie.clear();
         Ok(())
     }
@@ -96,7 +90,6 @@ where
         self.root_hash = EMPTY_ROOT_HASH;
         self.account_trie = None;
         self.storage_tries.clear();
-        self.sub_storage_tries.clear();
         self.accounts_with_storage_trie.clear();
         self.difflayer = None;
     }
@@ -114,7 +107,6 @@ where
             storage_tries: HashMap::new(),
             accounts_with_storage_trie: HashMap::new(),
             difflayer: None,
-            sub_storage_tries: HashMap::new(),
             path_db: self.path_db.clone(),
             snap_db: self.snap_db.clone(),
             metrics: self.metrics.clone()

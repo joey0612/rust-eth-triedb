@@ -171,12 +171,11 @@ where
                 // if the account is being rebuilt, use the new account
                 new_account.unwrap()
             }else {
-                // let cached_storage_root = self.storage_root_cache.read().unwrap().peek(&hashed_address.as_slice().to_vec()).cloned();
-                // if let Some(cached_storage_root) = cached_storage_root {
-                //         let mut new_account = new_account.unwrap();
-                //         new_account.storage_root = B256::from_slice(cached_storage_root.as_ref().unwrap().as_slice());
-                //         new_account
-                // } else {
+                if let Some(storage_root) = self.snap_db.get_storage_root(hashed_address).unwrap() {
+                    let mut new_account = new_account.unwrap();
+                    new_account.storage_root = storage_root;
+                    new_account
+                } else {
                     get_storage_root_from_trie_count += 1;
                     // if the account is not being rebuilt, use the old account
                     let old_account = self.get_account_with_hash_state(hashed_address)?;           
@@ -193,7 +192,7 @@ where
                             new_account.unwrap()
                         }
                     }
-                // }
+                }
             };
 
             // self.storage_root_cache.write().unwrap().insert(hashed_address.as_slice().to_vec(), Some(final_account.storage_root.as_slice().to_vec()));
@@ -259,8 +258,7 @@ where
                     .collect()
             }
         );
-        self.sub_storage_tries = update_storage;
-        // self.storage_tries = update_storage;
+        self.storage_tries = update_storage;
 
         drop(path_db_clone);
         drop(difflayer_clone);

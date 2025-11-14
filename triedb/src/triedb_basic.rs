@@ -62,7 +62,7 @@ where
     pub fn calculate_hash(&mut self) -> Result<B256, TrieDBError> {
         let hash_start = Instant::now();
 
-        let (storage_hashes, storage_tries): (HashMap<B256, B256>, HashMap<B256, StateTrie<DB>>) = self.sub_storage_tries
+        let (storage_hashes, storage_tries): (HashMap<B256, B256>, HashMap<B256, StateTrie<DB>>) = self.storage_tries
         .par_iter()
         .map(|(key, trie)| {
             let mut trie_clone = trie.clone();
