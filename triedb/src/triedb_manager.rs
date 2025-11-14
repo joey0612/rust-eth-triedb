@@ -5,6 +5,7 @@
 
 use std::sync::{OnceLock};
 use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
+use rust_eth_triedb_snapshotdb::{SnapshotDB, PathProviderConfig as SnapshotPathProviderConfig};
 use super::TrieDB;
 use rust_eth_triedb_state_trie::node::init_empty_root_node;
 
@@ -50,12 +51,13 @@ impl TrieDBManager {
     /// Create a new TrieDBManager with the given database
     fn new() -> Self {
         let current_dir = std::env::current_dir().unwrap();
-        let db_path = current_dir.join("data").join("rust_eth_triedb").to_string_lossy().to_string();
+        let path_db_dir = current_dir.join("data").join("rust_eth_triedb").to_string_lossy().to_string();
+        let pathdb = PathDB::new(&path_db_dir, PathProviderConfig::default()).expect("Failed to create PathDB");
 
-        // Create path database and TrieDB instance
-        let config = PathProviderConfig::default();
-        let pathdb = PathDB::new(&db_path, config).expect("Failed to create PathDB");
-        let triedb = TrieDB::new(pathdb);
+        let snap_db_dir = current_dir.join("data").join("rust_eth_triedb_snapshots").to_string_lossy().to_string();
+        let snapdb = SnapshotDB::new(&snap_db_dir, SnapshotPathProviderConfig::default()).expect("Failed to create SnapshotDB");
+        
+        let triedb = TrieDB::new(pathdb, snapdb);
         Self {
             triedb,
         }

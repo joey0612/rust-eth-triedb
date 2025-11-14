@@ -391,24 +391,25 @@ impl TrieDatabase for PathDB {
     }
 
     fn batch_commit(&self, batch: Self::Batch) -> Result<(), Self::Error> {
-        match self.db.write_opt(batch.batch, &self.write_options) {
-            Ok(()) => {
-                {
-                    // Update cache with batch operations
-                    let mut cache = self.cache.lock().unwrap();
-                    for (key, value) in &batch.operations {
-                        match value {
-                            Some(val) => {
-                                // Insert or update operation
-                                cache.insert(key.clone(), Some(val.clone()));
-                            }
-                            None => {
-                                // Delete operation
-                                cache.remove(key);
-                            }
-                        }
+        {
+            // Update cache with batch operations
+            let mut cache = self.cache.lock().unwrap();
+            for (key, value) in &batch.operations {
+                match value {
+                    Some(val) => {
+                        // Insert or update operation
+                        cache.insert(key.clone(), Some(val.clone()));
+                    }
+                    None => {
+                        // Delete operation
+                        cache.remove(key);
                     }
                 }
+            }
+        }
+
+        match self.db.write_opt(batch.batch, &self.write_options) {
+            Ok(()) => {
                 trace!(target: "pathdb::batch", "Successfully committed batch to database");
                 Ok(())
             }

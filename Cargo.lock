@@ -2506,6 +2506,7 @@ dependencies = [
  "reth-trie-common",
  "rust-eth-triedb-common",
  "rust-eth-triedb-pathdb",
+ "rust-eth-triedb-snapshotdb",
  "rust-eth-triedb-state-trie",
  "schnellru",
  "serde",

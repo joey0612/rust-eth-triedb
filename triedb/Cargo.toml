@@ -18,6 +18,7 @@ jemalloc-prof = ["tikv-jemallocator?/profiling"]
 rust-eth-triedb-state-trie.workspace = true
 rust-eth-triedb-common.workspace = true
 rust-eth-triedb-pathdb.workspace = true
+rust-eth-triedb-snapshotdb.workspace = true
 
 #alloy
 alloy-trie.workspace = true

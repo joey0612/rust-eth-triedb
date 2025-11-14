@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use alloy_primitives::B256;
 use alloy_trie::EMPTY_ROOT_HASH;
 use rust_eth_triedb_common::TrieDatabase;
+use rust_eth_triedb_snapshotdb::SnapshotDB;
 use rust_eth_triedb_state_trie::node::DiffLayers;
 use rust_eth_triedb_state_trie::state_trie::StateTrie;
 use rust_eth_triedb_state_trie::account::StateAccount;
@@ -44,7 +45,7 @@ where
     pub(crate) sub_storage_tries: HashMap<B256, StateTrie<DB>>,
 
     pub path_db: DB,
-    // storage_root_cache: Arc<RwLock<LruMap<Vec<u8>, Option<Vec<u8>>, ByLength>>>,
+    pub snap_db: SnapshotDB,
     pub(crate) metrics: TrieDBMetrics,
 }
 
@@ -55,7 +56,7 @@ where
     DB::Error: std::fmt::Debug,
 {
     /// Creates a new trie database
-    pub fn new(path_db: DB) -> Self {
+    pub fn new(path_db: DB, snap_db: SnapshotDB) -> Self {
         Self {
             root_hash: EMPTY_ROOT_HASH,
             account_trie: None,
@@ -64,6 +65,7 @@ where
             difflayer: None,
             sub_storage_tries: HashMap::new(),
             path_db: path_db.clone(),
+            snap_db: snap_db.clone(),
             metrics: TrieDBMetrics::new_with_labels(&[("instance", "default")]),
         }
     }
@@ -114,6 +116,7 @@ where
             difflayer: None,
             sub_storage_tries: HashMap::new(),
             path_db: self.path_db.clone(),
+            snap_db: self.snap_db.clone(),
             metrics: self.metrics.clone()
         }
     }
