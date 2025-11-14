@@ -68,8 +68,8 @@ where
     }
 
     pub fn clear_cache(&mut self) {
-        // self.storage_root_cache.write().unwrap().clear();
         self.path_db.clear_cache();
+        // self.snap_db.clear_cache();
     }
 }
 
