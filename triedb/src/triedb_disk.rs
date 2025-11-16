@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 use std::time::Instant;
-use tracing::{debug, info};
+use tracing::debug;
 
 use alloy_primitives::B256;
 use rust_eth_triedb_common::{TrieDatabase, DiffLayer};
@@ -24,7 +24,6 @@ where
 
         if let Some(root) = self.path_db.get_storage_root(hased_address)
             .map_err(|e| TrieDBError::Database(format!("Failed to get storage root: {:?}", e)))? {
-            info!(target: "triedb::get_storage_root", "Found storage root in pathdb for address: {:?}, root: {:?}", hased_address, root);
             return Ok(Some(root));
         }
 

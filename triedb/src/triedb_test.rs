@@ -6,7 +6,6 @@ use alloy_trie::{EMPTY_ROOT_HASH};
 use rust_eth_triedb_state_trie::account::StateAccount;
 use rust_eth_triedb_state_trie::node::{MergedNodeSet, DiffLayer, DiffLayers, init_empty_root_node};
 use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
-// use rust_eth_triedb_snapshotdb::{SnapshotDB, PathProviderConfig as SnapshotPathProviderConfig};
 use crate::{TrieDB, TrieDBError};
 use tempfile::TempDir;
 use once_cell::sync::Lazy;
@@ -20,13 +19,10 @@ fn test_triedb_update_all_operations_without_difflayer() {
 
     // Create temporary directories for databases
     let path_db_temp_dir = TempDir::new().expect("Failed to create temp directory for PathDB");
-    // let snap_db_temp_dir = TempDir::new().expect("Failed to create temp directory for SnapshotDB");
     let path_db_path = path_db_temp_dir.path().to_str().unwrap();
-    // let snap_db_path = snap_db_temp_dir.path().to_str().unwrap();
     
     // Create path database and TrieDB instance
     let path_db = PathDB::new(path_db_path, PathProviderConfig::default()).expect("Failed to create PathDB");
-    // let snap_db = SnapshotDB::new(snap_db_path, SnapshotPathProviderConfig::default()).expect("Failed to create SnapshotDB");
     let mut triedb = TrieDB::new(path_db);
     
     println!("=== Starting TrieDB Test ===");
@@ -46,13 +42,10 @@ fn test_triedb_update_all_operations_with_difflayer() {
     init_empty_root_node();
     // Create temporary directories for databases
     let path_db_temp_dir = TempDir::new().expect("Failed to create temp directory for PathDB");
-    // let snap_db_temp_dir = TempDir::new().expect("Failed to create temp directory for SnapshotDB");
     let path_db_path = path_db_temp_dir.path().to_str().unwrap();
-    // let snap_db_path = snap_db_temp_dir.path().to_str().unwrap();
     
     // Create path database and TrieDB instance
     let path_db = PathDB::new(path_db_path, PathProviderConfig::default()).expect("Failed to create PathDB");
-    // let snap_db = SnapshotDB::new(snap_db_path, SnapshotPathProviderConfig::default()).expect("Failed to create SnapshotDB");
     let mut triedb = TrieDB::new(path_db);
     
     println!("=== Starting TrieDB Test With Difflayer===");
@@ -341,14 +334,11 @@ fn test_multiple_accounts_update() {
 
     // Create temporary directories for databases
     let path_db_temp_dir = TempDir::new().expect("Failed to create temp directory for PathDB");
-    // let snap_db_temp_dir = TempDir::new().expect("Failed to create temp directory for SnapshotDB");
     let path_db_path = path_db_temp_dir.path().to_str().unwrap();
-    // let snap_db_path = snap_db_temp_dir.path().to_str().unwrap();
-    
+
     // Create path database and TrieDB instance
     let config = PathProviderConfig::default();
     let path_db = PathDB::new(path_db_path, config).expect("Failed to create PathDB");
-    // let snap_db = SnapshotDB::new(snap_db_path, SnapshotPathProviderConfig::default()).expect("Failed to create SnapshotDB");
     let mut triedb = TrieDB::new(path_db);
 
     let total_operations = 10000;
