@@ -119,26 +119,22 @@ where
 
         self.metrics.record_hashed_post_state_transform_duration(hashed_post_state_transform_start.elapsed().as_secs_f64());
 
-        let (root_hash, node_set) = self.update_and_commit(
+        let (root_hash, node_set, diff_storage_roots) = self.update_and_commit(
             root_hash, 
             difflayer, 
             states, 
             states_rebuild, 
             storage_states)?;
 
-        if let Some(node_set) = node_set {
-            // let difflayer = node_set.to_difflayer();
-            let diff_nodes = (*node_set.to_diff_nodes()).clone();
-            let difflayer = Arc::new(DiffLayer::new(diff_nodes, self.updated_storage_roots.clone()));
-            return Ok((root_hash, Some(difflayer)));
-        } 
-
-        if !self.updated_storage_roots.is_empty() {
-            let difflayer = Arc::new(DiffLayer::new(HashMap::new(), self.updated_storage_roots.clone()));
-            return Ok((root_hash, Some(difflayer)));
+        let diff_nodes = (*node_set.to_diff_nodes()).clone();
+        let difflayer = Arc::new(DiffLayer::new(diff_nodes, diff_storage_roots));
+        
+        if difflayer.is_empty() {
+            return Ok((root_hash, None));
         }
         
-        Ok((root_hash, None))
+        return Ok((root_hash, Some(difflayer)));
+        
     }
 
     /// Batch update the changes and commit
@@ -156,7 +152,7 @@ where
         states: HashMap<B256, Option<StateAccount>>,
         states_rebuild: HashSet<B256>,
         storage_states: HashMap<B256, HashMap<B256, Option<U256>>>) -> 
-        Result<(B256, Option<Arc<MergedNodeSet>>), TrieDBError> {
+        Result<(B256, Arc<MergedNodeSet>, HashMap<B256, B256>), TrieDBError> {
         
         let update_prepare_start = Instant::now();
 
@@ -255,9 +251,10 @@ where
 
         // 5. Commit the changes
         let (root_hash, node_set) = self.commit(true)?;
+        let diff_storage_roots = self.updated_storage_roots.clone();
         self.clean();
 
-        Ok((root_hash, Some(node_set)))
+        Ok((root_hash, node_set, diff_storage_roots))
     }
 }
 

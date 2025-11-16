@@ -107,46 +107,42 @@ fn test_update_all_initial(triedb: &mut TrieDB<PathDB>) -> Result<(B256, Option<
     // Call update_all interface
     let result = triedb.update_and_commit(EMPTY_ROOT_HASH, None, states, HashSet::new(), storage_states);
     match &result {
-        Ok((root_hash, node_set)) => {            
+        Ok((root_hash, node_set, diff_storage_roots)) => {            
             // Assert that root_hash matches BSC implementation result
             let expected_hash = B256::from_str("0xadcc848b76bace28ea81dd449a735bad44663a36f18f40980d586d5315eb3800")
                 .expect("Failed to parse expected hash");
             assert_eq!(*root_hash, expected_hash, "Root hash should match BSC implementation");
             println!("✅ Root hash assertion passed: matches BSC implementation, root hash: {:?}", root_hash);
 
-            if let Some(nodes) = node_set {
-                for (owner, nodes) in nodes.sets.iter() {                    
-                    if let Some(expected_signature) = BSC_SIGNATURES_ONE.get(owner) {
-                        assert_eq!(
-                            nodes.signature(), 
-                            *expected_signature, 
-                            "Signature for owner {:?} should match BSC implementation", 
-                            owner
-                        );
-                    } else {
-                        panic!("⚠️  No BSC signature found for owner {:?}", owner);
-                    }
+            for (owner, nodes) in node_set.sets.iter() {                    
+                if let Some(expected_signature) = BSC_SIGNATURES_ONE.get(owner) {
+                    assert_eq!(
+                        nodes.signature(), 
+                        *expected_signature, 
+                        "Signature for owner {:?} should match BSC implementation", 
+                        owner
+                    );
+                } else {
+                    panic!("⚠️  No BSC signature found for owner {:?}", owner);
                 }
             }
             println!("✅ NodeSet signature assertion passed: matches BSC implementation");
 
             // Call flush and print hash
-            if let Some(nodes) = node_set {
-                let diff_nodes = (*nodes.to_diff_nodes()).clone();
-                let difflayer = Arc::new(DiffLayer::new(diff_nodes, HashMap::new()));
-                let flush_result = triedb.flush(0, B256::ZERO, &Some(difflayer));
-                match flush_result {
-                    Ok(()) => println!("flush executed successfully"),
-                    Err(e) => println!("flush failed: {:?}", e),
-                }
+            let diff_nodes = (*node_set.to_diff_nodes()).clone();
+            let difflayer = Arc::new(DiffLayer::new(diff_nodes, diff_storage_roots.clone()));
+            let flush_result = triedb.flush(0, B256::ZERO, &Some(difflayer));
+            match flush_result {
+                Ok(()) => println!("flush executed successfully"),
+                Err(e) => println!("flush failed: {:?}", e),
             }
         }
         Err(e) => {
             println!("update_all_one failed: {:?}", e);
         }
     }
-
-    result
+    let (root_hash, node_set, _) = result.unwrap();
+    Ok((root_hash, Some(node_set)))
 }
 
 /// Test modification operations based on update_all results
@@ -207,7 +203,7 @@ fn test_update_all_modifications(root_hash: B256, difflayer: Option<Arc<MergedNo
     let result = triedb.update_and_commit(root_hash, difflayers.as_ref(), states, HashSet::new(), storage_states);
     
     match result {
-        Ok((root_hash, node_set)) => {
+        Ok((root_hash, node_set, diff_storage_roots)) => {
             // Assert that the root hash matches the BSC result
             let expected_hash = B256::from_str("0x626ca0a9ca91a1fe5e3a4f438f11015e6e64510b6a29c3a6362d98abad5e4875")
                 .expect("Failed to parse expected hash");
@@ -215,31 +211,30 @@ fn test_update_all_modifications(root_hash: B256, difflayer: Option<Arc<MergedNo
             println!("✅ Root hash assertion passed: matches BSC implementation, root hash: {:?}", root_hash);
             
             // Assert that the NodeSet signatures match BSC implementation and call flush
-            if let Some(node_sets) = node_set {
-                // First, verify signatures
-                for (owner, nodes) in node_sets.sets.iter() {                    
-                    if let Some(expected_signature) = BSC_SIGNATURES_TWO.get(owner) {
-                        assert_eq!(
-                            nodes.signature(), 
-                            *expected_signature, 
-                            "Signature for owner {:?} should match BSC implementation", 
-                            owner
-                        );
-                    } else {
-                        panic!("⚠️  No BSC signature found for owner {:?}", owner);
-                    }
-                }
-                println!("✅ NodeSet signature assertion passed: matches BSC implementation");
-                
-                let diff_nodes = (*node_sets.to_diff_nodes()).clone();
-                let difflayer = Arc::new(DiffLayer::new(diff_nodes, HashMap::new()));
-                // Call flush and print hash
-                let flush_result = triedb.flush(0, B256::ZERO, &Some(difflayer));
-                match flush_result {
-                    Ok(()) => println!("Modification flush executed successfully"),
-                    Err(e) => println!("Modification flush failed: {:?}", e),
+            // First, verify signatures
+            for (owner, nodes) in node_set.sets.iter() {                    
+                if let Some(expected_signature) = BSC_SIGNATURES_TWO.get(owner) {
+                    assert_eq!(
+                        nodes.signature(), 
+                        *expected_signature, 
+                        "Signature for owner {:?} should match BSC implementation", 
+                        owner
+                    );
+                } else {
+                    panic!("⚠️  No BSC signature found for owner {:?}", owner);
                 }
             }
+            println!("✅ NodeSet signature assertion passed: matches BSC implementation");
+            
+            let diff_nodes = (*node_set.to_diff_nodes()).clone();
+            let difflayer = Arc::new(DiffLayer::new(diff_nodes, diff_storage_roots));
+            // Call flush and print hash
+            let flush_result = triedb.flush(0, B256::ZERO, &Some(difflayer));
+            match flush_result {
+                Ok(()) => println!("Modification flush executed successfully"),
+                Err(e) => println!("Modification flush failed: {:?}", e),
+            }
+            
         }
         Err(e) => {
             println!("Modification update_all failed: {:?}", e);
@@ -371,7 +366,7 @@ fn test_multiple_accounts_update() {
         states.insert(hashed_address, Some(account));
     }
     // Update and commit
-    let (root_hash, merged_node_set) = triedb.update_and_commit(
+    let (root_hash, merged_node_set, diff_storage_roots) = triedb.update_and_commit(
         B256::ZERO,
         None,
         states,
@@ -379,11 +374,10 @@ fn test_multiple_accounts_update() {
         storage_states,
     ).unwrap();
 
-    if let Some(merged_node_set) = merged_node_set {
-        let diff_nodes = (*merged_node_set.to_diff_nodes()).clone();
-        let difflayer = Arc::new(DiffLayer::new(diff_nodes, HashMap::new()));
-        triedb.flush(0, root_hash, &Some(difflayer)).unwrap();
-    }
+    let diff_nodes = (*merged_node_set.to_diff_nodes()).clone();
+    let difflayer = Arc::new(DiffLayer::new(diff_nodes, diff_storage_roots));
+    triedb.flush(0, root_hash, &Some(difflayer)).unwrap();
+    
 
     triedb.state_at(root_hash, None).unwrap();
 

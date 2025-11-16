@@ -79,6 +79,11 @@ impl DiffLayer {
     pub fn get_storage_roots(&self, hased_address: B256) -> Option<B256> {
         self.diff_storage_roots.get(&hased_address).map(|root| *root)
     }
+
+    /// Returns true if the diff layer is empty
+    pub fn is_empty(&self) -> bool {
+        self.diff_nodes.is_empty() && self.diff_storage_roots.is_empty()
+    }
 }
 
 /// DiffLayers is a collection of diff layers for uncommitted blocks
