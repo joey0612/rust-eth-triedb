@@ -1,11 +1,11 @@
 //! PathDB implementation for RocksDB integration.
 
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fmt::Debug;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use rocksdb::{DB, Options, ReadOptions, WriteBatch, WriteOptions};
+use rocksdb::{ColumnFamilyDescriptor,DB, Options, ReadOptions, WriteBatch, WriteOptions};
 use schnellru::{ByLength, LruMap};
 use tracing::{error, trace, warn};
 
@@ -17,6 +17,11 @@ use reth_metrics::{
     metrics::{Counter},
     Metrics,
 };
+
+const DEFAULT_COLUMN_FAMILY_NAME: &str = "default";
+const STORAGE_ROOT_COLUMN_FAMILY_NAME: &str = "storage_root";
+
+const COLUMN_FAMILY_NAMES: [&str; 2] = [DEFAULT_COLUMN_FAMILY_NAME, STORAGE_ROOT_COLUMN_FAMILY_NAME];
 
 /// Metrics for the `TrieDB`.
 #[derive(Metrics, Clone)]
@@ -32,6 +37,8 @@ pub(crate) struct PathDBMetrics {
 pub struct PathDB {
     /// The underlying RocksDB instance.
     pub db: Arc<DB>,
+    /// Set of Column Family names that exist in the database.
+    column_family_names: Arc<Mutex<HashSet<String>>>,
     /// Configuration for the database.
     pub config: PathProviderConfig,
     /// Write options for batch operations.
@@ -48,6 +55,7 @@ impl Debug for PathDB {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("PathDB")
             .field("config", &self.config)
+            .field("column_family_names", &self.column_family_names)
             .finish()
     }
 }
@@ -63,6 +71,7 @@ impl Clone for PathDB {
 
         Self {
             db: self.db.clone(),
+            column_family_names: self.column_family_names.clone(),
             config: self.config.clone(),
             write_options,
             read_options,
@@ -83,8 +92,22 @@ impl PathDB {
         db_opts.set_max_background_jobs(config.max_background_jobs);
         db_opts.create_if_missing(config.create_if_missing);
 
-        let db = DB::open(&db_opts, path)
+        // Ensure all required Column Families exist
+        ensure_column_families(path, &db_opts, &config)?;
+
+        // Now open database with all required Column Families
+        let mut cf_descriptors = Vec::new();
+        for cf_name in COLUMN_FAMILY_NAMES {
+            let mut cf_opts = Options::default();
+            cf_opts.set_max_write_buffer_number(config.max_write_buffer_number);
+            cf_opts.set_write_buffer_size(config.write_buffer_size);
+            cf_descriptors.push(ColumnFamilyDescriptor::new(cf_name, cf_opts));
+        }
+
+        let db = DB::open_cf_descriptors(&db_opts, path, cf_descriptors)
             .map_err(|e| PathProviderError::Database(format!("Failed to open RocksDB: {}", e)))?;
+
+        let cf_names_set: HashSet<String> = COLUMN_FAMILY_NAMES.iter().map(|s| s.to_string()).collect();
 
         let write_options = WriteOptions::default();
 
@@ -98,6 +121,7 @@ impl PathDB {
 
         Ok(Self {
             db: Arc::new(db),
+            column_family_names: Arc::new(Mutex::new(cf_names_set)),
             config,
             write_options,
             read_options,
@@ -150,8 +174,12 @@ impl PathProvider for PathDB {
             }
         }
 
+        let cf = self.db.cf_handle(DEFAULT_COLUMN_FAMILY_NAME).ok_or_else(|| {
+            PathProviderError::Database(format!("Column Family '{}' handle not found", DEFAULT_COLUMN_FAMILY_NAME))
+        })?;
+
         // Cache miss, read from DB
-        match self.db.get_opt(key, &self.read_options) {
+        match self.db.get_cf_opt(&cf, key, &self.read_options) {
             Ok(Some(value)) => {
                 trace!(target: "pathdb::rocksdb", "Found value in DB for key: {:?}", key);
                 // Cache the value
@@ -175,8 +203,12 @@ impl PathProvider for PathDB {
         // Update cache first
         self.cache.lock().unwrap().insert(key.to_vec(), Some(value.to_vec()));
 
+        let cf = self.db.cf_handle(DEFAULT_COLUMN_FAMILY_NAME).ok_or_else(|| {
+            PathProviderError::Database(format!("Column Family '{}' handle not found", DEFAULT_COLUMN_FAMILY_NAME))
+        })?;
+
         // Then write to DB
-        match self.db.put_opt(key, value, &self.write_options) {
+        match self.db.put_cf_opt(&cf, key, value, &self.write_options) {
             Ok(()) => {
                 trace!(target: "pathdb::rocksdb", "Successfully put key: {:?}", key);
                 Ok(())
@@ -196,8 +228,12 @@ impl PathProvider for PathDB {
         // Remove from cache first
         self.cache.lock().unwrap().remove(key);
 
+        let cf = self.db.cf_handle(DEFAULT_COLUMN_FAMILY_NAME).ok_or_else(|| {
+            PathProviderError::Database(format!("Column Family '{}' handle not found", DEFAULT_COLUMN_FAMILY_NAME))
+        })?;
+
         // Then delete from DB
-        match self.db.delete_opt(key, &self.write_options) {
+        match self.db.delete_cf_opt(&cf, key, &self.write_options) {
             Ok(()) => {
                 trace!(target: "pathdb::rocksdb", "Successfully deleted key: {:?}", key);
                 Ok(())
@@ -224,8 +260,12 @@ impl PathProvider for PathDB {
             }
         }
 
+        let cf = self.db.cf_handle(DEFAULT_COLUMN_FAMILY_NAME).ok_or_else(|| {
+            PathProviderError::Database(format!("Column Family '{}' handle not found", DEFAULT_COLUMN_FAMILY_NAME))
+        })?;
+            
         // Cache miss, check DB
-        match self.db.get_opt(key, &self.read_options) {
+        match self.db.get_cf_opt(&cf, key, &self.read_options) {
             Ok(Some(_)) => {
                 trace!(target: "pathdb::rocksdb", "Key exists in DB: {:?}", key);
                 // Cache the existence
@@ -239,86 +279,6 @@ impl PathProvider for PathDB {
             Err(e) => {
                 error!(target: "pathdb::rocksdb", "Error checking existence of key {:?}: {}", key, e);
                 Err(PathProviderError::Database(format!("RocksDB exists error: {}", e)))
-            }
-        }
-    }
-
-    fn get_multi(&self, keys: &[Vec<u8>]) -> PathProviderResult<HashMap<Vec<u8>, Vec<u8>>> {
-        trace!(target: "pathdb::rocksdb", "Getting {} keys", keys.len());
-
-        let mut result = HashMap::new();
-
-        for key in keys {
-            if let Some(value) = self.get_raw(key)? {
-                result.insert(key.clone(), value);
-            }
-        }
-
-        trace!(target: "pathdb::rocksdb", "Retrieved {} values", result.len());
-        Ok(result)
-    }
-
-    fn put_multi(&self, kvs: &[(Vec<u8>, Vec<u8>)]) -> PathProviderResult<()> {
-        trace!(target: "pathdb::rocksdb", "Putting {} key-value pairs", kvs.len());
-
-        // Update cache first
-        {
-            let mut cache = self.cache.lock().unwrap();
-            for (key, value) in kvs {
-                cache.insert(key.clone(), Some(value.clone()));
-            }
-        }
-
-        // Then write to DB
-        let mut batch = WriteBatch::default();
-
-        for (key, value) in kvs {
-            batch.put(key, value);
-        }
-
-        match self.db.write_opt(batch, &self.write_options) {
-            Ok(()) => {
-                trace!(target: "pathdb::rocksdb", "Successfully put {} key-value pairs", kvs.len());
-                Ok(())
-            }
-            Err(e) => {
-                error!(target: "pathdb::rocksdb", "Error putting {} key-value pairs: {}", kvs.len(), e);
-                // Remove from cache on error
-                let mut cache = self.cache.lock().unwrap();
-                for (key, _) in kvs {
-                    cache.remove(key);
-                }
-                Err(PathProviderError::Database(format!("RocksDB put_multi error: {}", e)))
-            }
-        }
-    }
-
-    fn delete_multi(&self, keys: &[Vec<u8>]) -> PathProviderResult<()> {
-        trace!(target: "pathdb::rocksdb", "Deleting {} keys", keys.len());
-
-        // Remove from cache first
-        {
-            let mut cache = self.cache.lock().unwrap();
-            for key in keys {
-                cache.remove(key);
-            }
-        }
-
-        // Then delete from DB
-        let mut batch = WriteBatch::default();
-
-        for key in keys {
-            batch.delete(key);
-        }
-
-        match self.db.write_opt(batch, &self.write_options) {
-            Ok(()) => {
-                trace!(target: "pathdb::rocksdb", "Successfully deleted {} keys", keys.len());
-                Ok(())
-            }
-            Err(e) => {
-                error!(target: "pathdb::rocksdb", "Error deleting {} keys: {}", keys.len(), e);
-                Err(PathProviderError::Database(format!("RocksDB delete_multi error: {}", e)))
             }
         }
     }
@@ -387,23 +347,31 @@ impl TrieDatabase for PathDB {
     }
 
     fn commit_difflayer(&self, block_number: u64, state_root: B256, difflayer: &Option<Arc<DiffLayer>>) -> Result<(), Self::Error> {
+        // Get Column Family handle for default CF
+        let cf = self.db.cf_handle(DEFAULT_COLUMN_FAMILY_NAME).ok_or_else(|| {
+            PathProviderError::Database(format!("Column Family '{}' handle not found", DEFAULT_COLUMN_FAMILY_NAME))
+        })?;
+
         let mut batch = WriteBatch::default();
         {
             let mut cache = self.cache.lock().unwrap();
-            batch.put(TRIE_STATE_ROOT_KEY, state_root.as_slice());
-            batch.put(TRIE_STATE_BLOCK_NUMBER_KEY, &block_number.to_le_bytes());
+            // Write to default CF using put_cf
+            batch.put_cf(&cf, TRIE_STATE_ROOT_KEY, state_root.as_slice());
+            batch.put_cf(&cf, TRIE_STATE_BLOCK_NUMBER_KEY, &block_number.to_le_bytes());
             cache.insert(TRIE_STATE_ROOT_KEY.to_vec(), Some(state_root.as_slice().to_vec()));
             cache.insert(TRIE_STATE_BLOCK_NUMBER_KEY.to_vec(), Some(block_number.to_le_bytes().to_vec()));
         
             if let Some(difflayer) = difflayer {
                 for (key, node) in difflayer.diff_nodes.iter() {
                     if node.is_deleted() {
-                        batch.delete(key);
+                        // Delete from default CF using delete_cf
+                        batch.delete_cf(&cf, key);
                         cache.remove(key);
                     } else {
                         if let Some(blob) = &node.blob {
                             cache.insert(key.clone(), Some(blob.clone()));
-                            batch.put(key, blob);
+                            // Write to default CF using put_cf
+                            batch.put_cf(&cf, key, blob);
                         }
                     }
                 }
@@ -433,4 +401,84 @@ impl TrieDatabase for PathDB {
             Err(PathProviderError::Database("Latest persist state not found".to_string()))
         }
     }
+}
+
+
+/// Ensure all required Column Families exist in the database.
+/// Creates missing Column Families if they don't exist.
+///
+/// # Arguments
+/// * `path` - Path to the RocksDB database
+/// * `db_opts` - Database options
+/// * `config` - Path provider configuration
+///
+/// # Returns
+/// * `Ok(())` if all Column Families exist or were successfully created
+/// * `Err(PathProviderError)` if there was an error creating Column Families
+fn ensure_column_families(
+    path: &str,
+    db_opts: &Options,
+    config: &PathProviderConfig,
+) -> PathProviderResult<()> {
+    // List existing Column Families in the database
+    let existing_cfs = DB::list_cf(db_opts, path)
+        .unwrap_or_else(|_| vec!["default".to_string()]);
+    let existing_cfs_set: HashSet<String> = existing_cfs.iter().cloned().collect();
+
+    // Find missing Column Families
+    let missing_cfs: Vec<&str> = COLUMN_FAMILY_NAMES
+        .iter()
+        .filter(|&&cf_name| !existing_cfs_set.contains(cf_name))
+        .copied()
+        .collect();
+
+    // If no missing CFs, we're done
+    if missing_cfs.is_empty() {
+        trace!(
+            target: "pathdb::rocksdb",
+            "All required Column Families already exist"
+        );
+        return Ok(());
+    }
+
+    trace!(
+        target: "pathdb::rocksdb",
+        "Found {} missing Column Families: {:?}",
+        missing_cfs.len(),
+        missing_cfs
+    );
+
+    // Open database with existing CFs first
+    let mut existing_cf_descriptors = Vec::new();
+    for cf_name in &existing_cfs {
+        let mut cf_opts = Options::default();
+        cf_opts.set_max_write_buffer_number(config.max_write_buffer_number);
+        cf_opts.set_write_buffer_size(config.write_buffer_size);
+        existing_cf_descriptors.push(ColumnFamilyDescriptor::new(cf_name, cf_opts));
+    }
+
+    let temp_db = DB::open_cf_descriptors(db_opts, path, existing_cf_descriptors)
+        .map_err(|e| PathProviderError::Database(format!("Failed to open RocksDB: {}", e)))?;
+
+    // Create missing Column Families
+    for cf_name in missing_cfs {
+        let mut cf_opts = Options::default();
+        cf_opts.set_max_write_buffer_number(config.max_write_buffer_number);
+        cf_opts.set_write_buffer_size(config.write_buffer_size);
+        temp_db.create_cf(cf_name, &cf_opts).map_err(|e| {
+            PathProviderError::Database(format!(
+                "Failed to create Column Family '{}': {}",
+                cf_name, e
+            ))
+        })?;
+        trace!(
+            target: "pathdb::rocksdb",
+            "Created Column Family '{}'",
+            cf_name
+        );
+    }
+    // Drop temp_db to close it before reopening with all CFs
+    drop(temp_db);
+
+    Ok(())
 }

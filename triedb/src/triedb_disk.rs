@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 use std::time::Instant;
-use tracing::info;
+use tracing::debug;
 
 use alloy_primitives::B256;
 use rust_eth_triedb_common::{TrieDatabase, DiffLayer};
@@ -27,7 +27,7 @@ where
             .map_err(|e| TrieDBError::Database(format!("Failed to commit difflayer: {:?}", e)))?;
         
         self.metrics.record_flush_duration(flush_start.elapsed().as_secs_f64());
-        info!(target: "triedb::flush", "Async persisted block number: {}, state root: {:?}, duration: {:?}", block_number, state_root, flush_start.elapsed());
+        debug!(target: "triedb::flush", "Persisted block number: {}, state root: {:?}, duration: {:?}", block_number, state_root, flush_start.elapsed());
         Ok(())
     }
 

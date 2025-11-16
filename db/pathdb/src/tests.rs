@@ -29,37 +29,6 @@ fn test_basic_operations() {
 }
 
 #[test]
-fn test_multi_operations() {
-    let temp_dir = TempDir::new().unwrap();
-    let db_path = temp_dir.path();
-    let db = PathDB::new(db_path.to_str().unwrap(), PathProviderConfig::default()).unwrap();
-
-    // Test put_multi and get_multi
-    let kvs = vec![
-        (b"key1".to_vec(), b"value1".to_vec()),
-        (b"key2".to_vec(), b"value2".to_vec()),
-        (b"key3".to_vec(), b"value3".to_vec()),
-    ];
-
-    db.put_multi(&kvs).unwrap();
-
-    let keys: Vec<Vec<u8>> = kvs.iter().map(|(k, _)| k.clone()).collect();
-    let retrieved = db.get_multi(&keys).unwrap();
-
-    assert_eq!(retrieved.len(), 3);
-    assert_eq!(retrieved.get(&b"key1".to_vec()).unwrap(), &b"value1".to_vec());
-    assert_eq!(retrieved.get(&b"key2".to_vec()).unwrap(), &b"value2".to_vec());
-    assert_eq!(retrieved.get(&b"key3".to_vec()).unwrap(), &b"value3".to_vec());
-
-    // Test delete_multi
-    db.delete_multi(&keys).unwrap();
-    
-    for key in &keys {
-        assert_eq!(db.get(key).unwrap(), None);
-    }
-}
-
-#[test]
 fn test_cache_operations() {
     let temp_dir = TempDir::new().unwrap();
     let db_path = temp_dir.path();

@@ -1,6 +1,5 @@
 //! PathProvider trait definitions for key-value database operations.
 
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -52,15 +51,6 @@ pub trait PathProvider: Send + Sync + Debug {
 
     /// Check if a key exists.
     fn exists_raw(&self, key: &[u8]) -> PathProviderResult<bool>;
-
-    /// Get multiple values by keys.
-    fn get_multi(&self, keys: &[Vec<u8>]) -> PathProviderResult<HashMap<Vec<u8>, Vec<u8>>>;
-
-    /// Put multiple key-value pairs.
-    fn put_multi(&self, kvs: &[(Vec<u8>, Vec<u8>)]) -> PathProviderResult<()>;
-
-    /// Delete multiple keys.
-    fn delete_multi(&self, keys: &[Vec<u8>]) -> PathProviderResult<()>;
 }
 
 /// Trait for database management operations.

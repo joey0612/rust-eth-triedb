@@ -9,7 +9,7 @@
 //! - Perform operations on specific Column Families
 //! - Maintain isolation between different data types
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fmt::Debug;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -42,6 +42,11 @@ pub(crate) struct PathDBCFMetrics {
 /// This implementation allows you to use multiple Column Families (tables)
 /// within a single RocksDB instance. Each Column Family can be configured
 /// independently and provides logical separation of data.
+///
+/// Note: Column Family handles are not cached because RocksDB Rust API's
+/// `cf_handle()` returns `BoundColumnFamily` which has lifetime constraints.
+/// However, `cf_handle()` is a lightweight operation that just returns a reference,
+/// so the performance impact is minimal.
 pub struct PathDBCF {
     /// The underlying RocksDB instance.
     db: Arc<DB>,
@@ -573,27 +578,6 @@ impl PathProvider for PathDBCF {
 
     fn exists_raw(&self, key: &[u8]) -> PathProviderResult<bool> {
         self.exists_raw_cf("default", key)
-    }
-
-    fn get_multi(&self, keys: &[Vec<u8>]) -> PathProviderResult<HashMap<Vec<u8>, Vec<u8>>> {
-        let mut result = HashMap::new();
-        for key in keys {
-            if let Some(value) = self.get_raw(key)? {
-                result.insert(key.clone(), value);
-            }
-        }
-        Ok(result)
-    }
-
-    fn put_multi(&self, kvs: &[(Vec<u8>, Vec<u8>)]) -> PathProviderResult<()> {
-        self.put_multi_cf("default", kvs)
-    }
-
-    fn delete_multi(&self, keys: &[Vec<u8>]) -> PathProviderResult<()> {
-        for key in keys {
-            self.delete_raw(key)?;
-        }
-        Ok(())
     }
 }
 
