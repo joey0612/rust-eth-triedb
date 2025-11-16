@@ -388,19 +388,21 @@ impl TrieDatabase for PathDB {
 
     fn commit_difflayer(&self, block_number: u64, state_root: B256, difflayer: &Option<Arc<DiffLayer>>) -> Result<(), Self::Error> {
         let mut batch = WriteBatch::default();
-        batch.put(TRIE_STATE_ROOT_KEY, state_root.as_slice());
-        batch.put(TRIE_STATE_BLOCK_NUMBER_KEY, &block_number.to_le_bytes());
-
-        if let Some(difflayer) = difflayer {
+        {
             let mut cache = self.cache.lock().unwrap();
-            for (key, node) in difflayer.diff_nodes.iter() {
-                if node.is_deleted() {
-                    batch.delete(key);
-                    cache.remove(key);
-                } else {
-                    if let Some(blob) = &node.blob {
-                        cache.insert(key.clone(), Some(blob.clone()));
-                        batch.put(key, blob);
+            batch.put(TRIE_STATE_ROOT_KEY, state_root.as_slice());
+            batch.put(TRIE_STATE_BLOCK_NUMBER_KEY, &block_number.to_le_bytes());
+        
+            if let Some(difflayer) = difflayer {
+                for (key, node) in difflayer.diff_nodes.iter() {
+                    if node.is_deleted() {
+                        batch.delete(key);
+                        cache.remove(key);
+                    } else {
+                        if let Some(blob) = &node.blob {
+                            cache.insert(key.clone(), Some(blob.clone()));
+                            batch.put(key, blob);
+                        }
                     }
                 }
             }
