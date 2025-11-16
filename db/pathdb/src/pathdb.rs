@@ -392,6 +392,8 @@ impl TrieDatabase for PathDB {
             let mut cache = self.cache.lock().unwrap();
             batch.put(TRIE_STATE_ROOT_KEY, state_root.as_slice());
             batch.put(TRIE_STATE_BLOCK_NUMBER_KEY, &block_number.to_le_bytes());
+            cache.insert(TRIE_STATE_ROOT_KEY.to_vec(), Some(state_root.as_slice().to_vec()));
+            cache.insert(TRIE_STATE_BLOCK_NUMBER_KEY.to_vec(), Some(block_number.to_le_bytes().to_vec()));
         
             if let Some(difflayer) = difflayer {
                 for (key, node) in difflayer.diff_nodes.iter() {
