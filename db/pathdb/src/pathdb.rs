@@ -9,8 +9,9 @@ use rocksdb::{DB, Options, ReadOptions, WriteBatch, WriteOptions};
 use schnellru::{ByLength, LruMap};
 use tracing::{error, trace, warn};
 
+use alloy_primitives::B256;
 use crate::traits::*;
-use rust_eth_triedb_common::{TrieDatabase, TrieDatabaseBatch};
+use rust_eth_triedb_common::{TrieDatabase, DiffLayer, TRIE_STATE_ROOT_KEY, TRIE_STATE_BLOCK_NUMBER_KEY};
 
 use reth_metrics::{
     metrics::{Counter},
@@ -364,7 +365,6 @@ impl PathProviderManager for PathDB {
 
 impl TrieDatabase for PathDB {
     type Error = PathProviderError;
-    type Batch = PathDBBatch;
 
     fn get(&self, path: &[u8]) -> Result<Option<Vec<u8>>, Self::Error> {
         self.get_raw(path)
@@ -386,85 +386,47 @@ impl TrieDatabase for PathDB {
         self.clear_cache();
     }
 
-    fn create_batch(&self) -> Result<Self::Batch, Self::Error> {
-        Ok(PathDBBatch::new())
-    }
+    fn commit_difflayer(&self, block_number: u64, state_root: B256, difflayer: &Option<Arc<DiffLayer>>) -> Result<(), Self::Error> {
+        let mut batch = WriteBatch::default();
+        batch.put(TRIE_STATE_ROOT_KEY, state_root.as_slice());
+        batch.put(TRIE_STATE_BLOCK_NUMBER_KEY, &block_number.to_le_bytes());
 
-    fn batch_commit(&self, batch: Self::Batch) -> Result<(), Self::Error> {
-        {
-            // Update cache with batch operations
+        if let Some(difflayer) = difflayer {
             let mut cache = self.cache.lock().unwrap();
-            for (key, value) in &batch.operations {
-                match value {
-                    Some(val) => {
-                        // Insert or update operation
-                        cache.insert(key.clone(), Some(val.clone()));
-                    }
-                    None => {
-                        // Delete operation
-                        cache.remove(key);
+            for (key, node) in difflayer.diff_nodes.iter() {
+                if node.is_deleted() {
+                    batch.delete(key);
+                    cache.remove(key);
+                } else {
+                    if let Some(blob) = &node.blob {
+                        cache.insert(key.clone(), Some(blob.clone()));
+                        batch.put(key, blob);
                     }
                 }
             }
         }
 
-        match self.db.write_opt(batch.batch, &self.write_options) {
+        match self.db.write_opt(batch, &self.write_options) {
             Ok(()) => {
                 trace!(target: "pathdb::batch", "Successfully committed batch to database");
                 Ok(())
             }
             Err(e) => {
-                error!(target: "pathdb::batch", "Error committing batch: {}", e);
+                error!(target: "pathdb::batch", "Error committing batch: block_number: {}, state_root: {:?}, error: {}", block_number, state_root, e);
                 Err(PathProviderError::Database(format!("Batch commit error: {}", e)))
             }
         }
     }
-}
 
-// PathDB batch implementation using RocksDB WriteBatch
-pub struct PathDBBatch {
-    /// The underlying RocksDB WriteBatch
-    pub batch: WriteBatch,
-    /// Track operations for cache updates
-    operations: Vec<(Vec<u8>, Option<Vec<u8>>)>, // (key, value) where None means delete
-}
-
-impl PathDBBatch {
-    /// Create a new PathDB batch
-    pub fn new() -> Self {
-        Self {
-            batch: WriteBatch::default(),
-            operations: Vec::new(),
+    fn latest_persist_state(&self) -> Result<(u64, B256), Self::Error> {
+        let block_number_bytes = self.get(TRIE_STATE_BLOCK_NUMBER_KEY)?;
+        let state_root_bytes = self.get(TRIE_STATE_ROOT_KEY)?;
+        if let (Some(block_number_bytes), Some(state_root_bytes)) = (block_number_bytes, state_root_bytes) {
+            let block_number = u64::from_le_bytes(block_number_bytes.try_into().unwrap());
+            let state_root = B256::from_slice(&state_root_bytes);
+            Ok((block_number, state_root))
+        } else {
+            Err(PathProviderError::Database("Latest persist state not found".to_string()))
         }
-    }
-}
-
-impl TrieDatabaseBatch for PathDBBatch {
-    type Error = PathProviderError;
-
-    fn insert(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Self::Error> {
-        self.batch.put(key, &value);
-        self.operations.push((key.to_vec(), Some(value)));
-        Ok(())
-    }
-
-    fn delete(&mut self, key: &[u8]) -> Result<(), Self::Error> {
-        self.batch.delete(key);
-        self.operations.push((key.to_vec(), None));
-        Ok(())
-    }
-
-    fn is_empty(&self) -> bool {
-        self.batch.is_empty()
-    }
-
-    fn len(&self) -> usize {
-        self.batch.len()
-    }
-
-    fn clear(&mut self) -> Result<(), Self::Error> {
-        self.batch.clear();
-        self.operations.clear();
-        Ok(())
     }
 }

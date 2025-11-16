@@ -1,36 +1,15 @@
 //! Database traits for trie operations.
 
+use std::sync::Arc;
+use alloy_primitives::B256;
 use auto_impl::auto_impl;
-
-/// Batch operation trait for efficient database writes
-pub trait TrieDatabaseBatch {
-    /// Associated error type for batch operations
-    type Error;
-
-    /// Insert a key-value pair into the batch
-    fn insert(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Self::Error>;
-
-    /// Delete a key from the batch
-    fn delete(&mut self, key: &[u8]) -> Result<(), Self::Error>;
-
-    /// Check if the batch is empty
-    fn is_empty(&self) -> bool;
-
-    /// Get the number of operations in the batch
-    fn len(&self) -> usize;
-
-    /// Clear all operations from the batch
-    fn clear(&mut self) -> Result<(), Self::Error>;
-}
+use crate::difflayer::DiffLayer;
 
 /// Simple database trait for trie operations
 #[auto_impl(Box, Arc, Clone, Send + Sync + Debug + Unpin + 'static)]
 pub trait TrieDatabase {
     /// Associated error type for database operations
     type Error;
-
-    /// Associated batch type for batch operations
-    type Batch: TrieDatabaseBatch<Error = Self::Error>;
 
     /// Get a node from the database by its hash
     fn get(&self, path: &[u8]) -> Result<Option<Vec<u8>>, Self::Error>;
@@ -44,11 +23,11 @@ pub trait TrieDatabase {
     /// Remove a node from the database and return its data if found
     fn remove(&self, path: &[u8]);
 
-    /// Create a new batch for batch operations
-    fn create_batch(&self) -> Result<Self::Batch, Self::Error>;
+    /// Commit a diff layer to the database
+    fn commit_difflayer(&self, block_number: u64, state_root: B256, difflayer: &Option<Arc<DiffLayer>>) -> Result<(), Self::Error>;
 
-    /// Commit a batch of operations atomically
-    fn batch_commit(&self, batch: Self::Batch) -> Result<(), Self::Error>;
+    /// Get the latest persisted state from the database
+    fn latest_persist_state(&self) -> Result<(u64, B256), Self::Error>;
 
     /// Clear the cache
     fn clear_cache(&self);

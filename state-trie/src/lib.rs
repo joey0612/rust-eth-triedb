@@ -37,4 +37,6 @@ pub use secure_trie::{SecureTrieId, SecureTrieBuilder, SecureTrieError};
 // pub use state_trie::{StateTrie, SecureTrie};
 pub use account::StateAccount;
 pub use traits::SecureTrieTrait;
-pub use node::{NodeSet, TrieNode, DiffLayer, DiffLayers};
+pub use node::NodeSet;
+// Re-export TrieNode, DiffLayer, DiffLayers from common crate
+pub use rust_eth_triedb_common::{TrieNode, DiffLayer, DiffLayers};

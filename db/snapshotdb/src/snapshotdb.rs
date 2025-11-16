@@ -10,7 +10,7 @@ use schnellru::{ByLength, LruMap};
 use tracing::{error, trace, warn};
 
 use alloy_primitives::B256;
-use rust_eth_triedb_state_trie::encoding::{TRIE_STATE_BLOCK_NUMBER_KEY, TRIE_STATE_ROOT_KEY};
+use rust_eth_triedb_common::{TRIE_STATE_ROOT_KEY, TRIE_STATE_BLOCK_NUMBER_KEY};
 
 use crate::traits::*;
 
