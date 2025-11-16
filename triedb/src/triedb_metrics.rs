@@ -1,7 +1,7 @@
 //! Metrics for TrieDB operations.
 
 use reth_metrics::{
-    metrics::{Histogram, Gauge},
+    metrics::{Histogram},
     Metrics,
 };
 
@@ -15,9 +15,6 @@ pub(crate) struct TrieDBMetrics {
     pub(crate) update_prepare_histogram: Histogram,
     /// Histogram of update and commit durations (in seconds)
     pub(crate) update_histogram: Histogram,
-
-    /// Gauge of get storage root from trie
-    pub(crate) get_storage_root_from_trie: Gauge,
 
     /// Histogram of hash durations (in seconds)
     pub(crate) hash_histogram: Histogram,

@@ -734,7 +734,7 @@ where
         }
 
         // 2. Check if the hash is in the database
-        if let Some(node_blob) = self.database.get(&key).map_err(|e| SecureTrieError::Database(format!("{:?}", e)))? {
+        if let Some(node_blob) = self.database.get_trie_node(&key).map_err(|e| SecureTrieError::Database(format!("{:?}", e)))? {
             self.tracer.on_read(prefix, node_blob.clone());
             return Ok(Node::must_decode_node(Some(*hash), &node_blob));
         }

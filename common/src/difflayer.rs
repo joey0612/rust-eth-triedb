@@ -104,7 +104,7 @@ impl DiffLayers {
     }
 
     /// Get a storage root by hased address
-    pub fn get_storage_roots(&self, hased_address: B256) -> Option<B256> {
+    pub fn get_storage_root(&self, hased_address: B256) -> Option<B256> {
         for difflayer in &self.diff_layers {
             if let Some(root) = difflayer.get_storage_roots(hased_address) {
                 return Some(root);

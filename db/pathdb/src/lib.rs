@@ -9,12 +9,10 @@
 //! - Column Family support for sharding/partitioning
 
 pub mod pathdb;
-pub mod pathdb_cf;
 pub mod traits;
 
 #[cfg(test)]
 pub mod tests;
 
 pub use pathdb::PathDB;
-pub use pathdb_cf::PathDBCF;
 pub use traits::*;

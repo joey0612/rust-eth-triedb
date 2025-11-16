@@ -77,6 +77,8 @@ where
             (hashes, tries)
         });
 
+        self.updated_storage_roots.extend(storage_hashes.clone());
+
         for (hashed_address, storage_hash) in storage_hashes {   
             let mut account = self.accounts_with_storage_trie.get(&hashed_address).unwrap().clone();
             account.storage_root = storage_hash;

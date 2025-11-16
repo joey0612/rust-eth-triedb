@@ -129,9 +129,15 @@ where
         if let Some(node_set) = node_set {
             // let difflayer = node_set.to_difflayer();
             let diff_nodes = (*node_set.to_diff_nodes()).clone();
-            let difflayer = Arc::new(DiffLayer::new(diff_nodes, HashMap::new()));
+            let difflayer = Arc::new(DiffLayer::new(diff_nodes, self.updated_storage_roots.clone()));
             return Ok((root_hash, Some(difflayer)));
         } 
+
+        if !self.updated_storage_roots.is_empty() {
+            let difflayer = Arc::new(DiffLayer::new(HashMap::new(), self.updated_storage_roots.clone()));
+            return Ok((root_hash, Some(difflayer)));
+        }
+        
         Ok((root_hash, None))
     }
 
@@ -160,45 +166,26 @@ where
         // 2. Prepare accounts to be updated
         let mut update_accounts = HashMap::new();
         let mut update_accounts_with_storage = HashMap::new();
-        let mut get_storage_root_from_trie_count = 0;
+
         for (hashed_address, new_account) in states {
             if new_account.is_none() {
-                // if the account is deleted, None is inserted
-                // self.storage_root_cache.write().unwrap().insert(hashed_address.as_slice().to_vec(), Some(alloy_trie::KECCAK_EMPTY.as_slice().to_vec()));
+                self.updated_storage_roots.insert(hashed_address, alloy_trie::KECCAK_EMPTY);
                 update_accounts.insert(hashed_address, None);
                 continue;
             }
 
             let final_account = if states_rebuild.contains(&hashed_address) {
-                // if the account is being rebuilt, use the new account
+                self.updated_storage_roots.insert(hashed_address, alloy_trie::KECCAK_EMPTY);
                 new_account.unwrap()
             }else {
-                // if let Some(storage_root) = self.snap_db.get_storage_root(hashed_address).unwrap() {
-                //     let mut new_account = new_account.unwrap();
-                //     new_account.storage_root = storage_root;
-                //     new_account
-                // } else {
-                    get_storage_root_from_trie_count += 1;
-                    // if the account is not being rebuilt, use the old account
-                    let old_account = self.get_account_with_hash_state(hashed_address)?;           
-                    match old_account {
-                        Some(mut acc) => {
-                            // keep the old account's storage root
-                            let new_account = new_account.unwrap();
-                            acc.nonce = new_account.nonce;
-                            acc.balance = new_account.balance;
-                            acc.code_hash = new_account.code_hash;
-                            acc
-                        }
-                        None => {
-                            new_account.unwrap()
-                        }
-                    }
-                // }
+                if let Some(storage_root) = self.get_storage_root(hashed_address)? {
+                    let mut new_account = new_account.unwrap();
+                    new_account.storage_root = storage_root;
+                    new_account
+                } else {
+                    new_account.unwrap()
+                }
             };
-
-            // self.storage_root_cache.write().unwrap().insert(hashed_address.as_slice().to_vec(), Some(final_account.storage_root.as_slice().to_vec()));
-            self.metrics.get_storage_root_from_trie.set(get_storage_root_from_trie_count as f64);
             
             if storage_states.contains_key(&hashed_address) {
                 update_accounts_with_storage.insert(hashed_address, final_account);

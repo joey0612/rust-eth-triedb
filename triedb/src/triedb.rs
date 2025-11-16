@@ -39,6 +39,7 @@ where
     pub(crate) account_trie: Option<StateTrie<DB>>,
     pub(crate) storage_tries: HashMap<B256, StateTrie<DB>>,
     pub(crate) accounts_with_storage_trie: HashMap<B256, StateAccount>,
+    pub(crate) updated_storage_roots: HashMap<B256, B256>,
     pub(crate) difflayer: Option<DiffLayers>,
     pub path_db: DB,
     // pub snap_db: SnapshotDB,
@@ -58,6 +59,7 @@ where
             account_trie: None,
             storage_tries: HashMap::new(),
             accounts_with_storage_trie: HashMap::new(),
+            updated_storage_roots: HashMap::new(),
             difflayer: None,
             path_db: path_db.clone(),
             // snap_db: snap_db.clone(),
@@ -74,6 +76,7 @@ where
             .build_with_difflayer(difflayer)?
         );
         self.root_hash = root_hash;
+        self.updated_storage_roots.clear();
         self.difflayer = difflayer.map(|d| d.clone());
         self.storage_tries.clear();
         self.accounts_with_storage_trie.clear();
@@ -91,6 +94,7 @@ where
         self.account_trie = None;
         self.storage_tries.clear();
         self.accounts_with_storage_trie.clear();
+        self.updated_storage_roots.clear();
         self.difflayer = None;
     }
 }
@@ -106,6 +110,7 @@ where
             account_trie: None,
             storage_tries: HashMap::new(),
             accounts_with_storage_trie: HashMap::new(),
+            updated_storage_roots: HashMap::new(),
             difflayer: None,
             path_db: self.path_db.clone(),
             // snap_db: self.snap_db.clone(),

@@ -19,6 +19,7 @@ rust-eth-triedb-common.workspace = true
 
 # Primitives
 alloy-primitives.workspace = true
+alloy-trie.workspace = true
 
 # RocksDB, 
 rocksdb = { workspace = true, features = ["multi-threaded-cf", "io-uring", "jemalloc"] }

@@ -2533,6 +2533,7 @@ name = "rust-eth-triedb-pathdb"
 version = "0.1.0"
 dependencies = [
  "alloy-primitives",
+ "alloy-trie",
  "metrics",
  "reth-metrics",
  "rocksdb",
