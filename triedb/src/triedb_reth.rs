@@ -245,50 +245,62 @@ where
         let difflayer_clone = self.difflayer.as_ref().map(|d| d.clone());
 
         // 4. Parallel execution: update accounts and storage simultaneously
-        let (_, update_storage): ((), HashMap<B256, StateTrie<DB>>) = rayon::join(
+        let (account_result, storage_result): (Result<(), TrieDBError>, Result<HashMap<B256, StateTrie<DB>>, TrieDBError>) = rayon::join(
             || {
                 // Task 1: Update account trie (serial execution)
                 // delete accounts that are being rebuilt, to collect deleted trie nodes
                 for hashed_address in states_rebuild {
-                    self.delete_account_with_hash_state(hashed_address).unwrap();
+                    self.delete_account_with_hash_state(hashed_address)
+                        .map_err(|e| TrieDBError::Database(format!("Failed to delete rebuild account for hashed_address {:#x}, error: {}", hashed_address, e)))?;
                 }
                 // update accounts that are being updated
                 for (hashed_address, account) in update_accounts {
                     if let Some(account) = account {
-                        self.update_account_with_hash_state(hashed_address, &account).unwrap();
+                        self.update_account_with_hash_state(hashed_address, &account)
+                            .map_err(|e| TrieDBError::Database(format!("Failed to update account for hashed_address {:#x}, error: {}", hashed_address, e)))?;
                     } else {
-                        self.delete_account_with_hash_state(hashed_address).unwrap();
+                        self.delete_account_with_hash_state(hashed_address)
+                            .map_err(|e| TrieDBError::Database(format!("Failed to delete account for hashed_address {:#x}, error: {}", hashed_address, e)))?;
                     }
                 }
+                Ok(())
             },
             || {
                 // Task 2: Update storage states (parallel execution for addresses, serial for kvs)
                 storage_states
                     .into_par_iter()
                     .map(|(hashed_address, kvs)| {
-                        let account = update_accounts_with_storage.get(&hashed_address).unwrap();
+                        let account = update_accounts_with_storage.get(&hashed_address)
+                            .ok_or_else(|| TrieDBError::Database(format!("Account not found for hashed_address: {:#x}", hashed_address)))?;
                         let storage_root = account.storage_root;
 
                         let id = SecureTrieId::new(storage_root)
                             .with_owner(hashed_address);
                         let mut storage_trie = SecureTrieBuilder::new(path_db_clone.clone())
                             .with_id(id)
-                            .build_with_difflayer(difflayer_clone.as_ref()).unwrap();
+                            .build_with_difflayer(difflayer_clone.as_ref())
+                            .map_err(|e| TrieDBError::Database(format!("Failed to build storage trie for hashed_address {:#x}, error: {}", hashed_address, e)))?;
 
                         // Serial execution for kvs within each address
                         for (hashed_key, new_value) in kvs {
                             if let Some(new_value) = new_value {
-                                storage_trie.update_storage_u256_with_hash_state(hashed_address, hashed_key, new_value).unwrap();
+                                storage_trie.update_storage_u256_with_hash_state(hashed_address, hashed_key, new_value)
+                                    .map_err(|e| TrieDBError::Database(format!("Failed to update storage for hashed_address {:#x}, hashed_key {:#x}, new_value {:#x}, error: {}", hashed_address, hashed_key, new_value, e)))?;
                             } else {
-                                storage_trie.delete_storage_with_hash_state(hashed_address, hashed_key).unwrap();
+                                storage_trie.delete_storage_with_hash_state(hashed_address, hashed_key)
+                                    .map_err(|e| TrieDBError::Database(format!("Failed to delete storage for hashed_address {:#x}, hashed_key {:#x}, error: {}", hashed_address, hashed_key, e)))?;
                             }
                         }
 
-                        (hashed_address, storage_trie)
+                        Ok((hashed_address, storage_trie))
                     })
-                    .collect()
+                    .collect::<Result<Vec<_>, _>>()
+                    .map(|vec| vec.into_iter().collect())
             }
         );
+        
+        account_result?;
+        let update_storage = storage_result?;
         self.storage_tries = update_storage;
 
         drop(path_db_clone);
