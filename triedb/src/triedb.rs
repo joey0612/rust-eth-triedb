@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use alloy_primitives::B256;
 use alloy_trie::EMPTY_ROOT_HASH;
 use rust_eth_triedb_common::TrieDatabase;
-// use rust_eth_triedb_snapshotdb::SnapshotDB;
 use rust_eth_triedb_state_trie::node::DiffLayers;
 use rust_eth_triedb_state_trie::state_trie::StateTrie;
 use rust_eth_triedb_state_trie::account::StateAccount;
@@ -42,7 +41,6 @@ where
     pub(crate) updated_storage_roots: HashMap<B256, B256>,
     pub(crate) difflayer: Option<DiffLayers>,
     pub path_db: DB,
-    // pub snap_db: SnapshotDB,
     pub(crate) metrics: TrieDBMetrics,
 }
 
@@ -62,7 +60,6 @@ where
             updated_storage_roots: HashMap::new(),
             difflayer: None,
             path_db: path_db.clone(),
-            // snap_db: snap_db.clone(),
             metrics: TrieDBMetrics::new_with_labels(&[("instance", "default")]),
         }
     }
@@ -113,7 +110,6 @@ where
             updated_storage_roots: HashMap::new(),
             difflayer: None,
             path_db: self.path_db.clone(),
-            // snap_db: self.snap_db.clone(),
             metrics: self.metrics.clone()
         }
     }

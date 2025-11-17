@@ -23,10 +23,20 @@ static MANAGER_INSTANCE: OnceLock<TrieDBManager> = OnceLock::new();
 /// Initialize the global manager instance.
 /// 
 /// This function must be called once at application startup before any calls to `get_global_triedb()`.
-/// Returns an error if the manager has already been initialized.
-pub fn init_global_manager() {
+/// The `path` parameter specifies the database path for the TrieDB instance.
+/// 
+/// # Behavior
+/// - On the first call, initializes the manager with the provided path.
+/// - On subsequent calls, the path parameter is ignored and the existing instance is returned.
+/// 
+/// # Arguments
+/// * `path` - Path to the database directory
+pub fn init_global_manager(path: &str) {
     init_empty_root_node();
-    MANAGER_INSTANCE.get_or_init(|| TrieDBManager::new());
+    MANAGER_INSTANCE.get_or_init(|| {
+        let path_str = path.to_string();
+        TrieDBManager::new(&path_str)
+    });
 }
 
 // Get the initialized manager instance
@@ -48,15 +58,14 @@ pub fn get_global_triedb() -> TrieDB<PathDB> {
 }
 
 impl TrieDBManager {
-    /// Create a new TrieDBManager with the given database
-    fn new() -> Self {
-        let current_dir = std::env::current_dir().unwrap();
-        let path_db_dir = current_dir.join("data").join("rust_eth_triedb").to_string_lossy().to_string();
-        let pathdb = PathDB::new(&path_db_dir, PathProviderConfig::default()).expect("Failed to create PathDB");
+    /// Create a new TrieDBManager with the given database path
+    /// 
+    /// # Arguments
+    /// * `path` - Path to the database directory
+    fn new(path: &str) -> Self {
+        let pathdb = PathDB::new(path, PathProviderConfig::default())
+            .expect("Failed to create PathDB");
 
-        // let snap_db_dir = current_dir.join("data").join("rust_eth_triedb_snapshots").to_string_lossy().to_string();
-        // let snapdb = SnapshotDB::new(&snap_db_dir, SnapshotPathProviderConfig::default()).expect("Failed to create SnapshotDB");
-        
         let triedb = TrieDB::new(pathdb);
         Self {
             triedb,

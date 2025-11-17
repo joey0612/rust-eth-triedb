@@ -53,7 +53,6 @@ where
 
     pub fn clear_cache(&mut self) {
         self.path_db.clear_cache();
-        // self.snap_db.clear_cache();
     }
 }
 

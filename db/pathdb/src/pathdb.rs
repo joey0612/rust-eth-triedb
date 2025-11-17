@@ -19,24 +19,81 @@ use reth_metrics::{
     Metrics,
 };
 
+/// The default column family name used for storing trie nodes.
+///
+/// This column family currently stores the actual trie node data, where each key
+/// represents a path prefix in the trie structure, and the value contains
+/// the encoded node data (RLP-encoded or similar format).
+///
+/// # Future Migration
+///
+/// The trie node data stored in this column family will be migrated to
+/// `TRIE_NODE_COLUMN_FAMILY_NAME` in the future. After migration, this column
+/// family may be deprecated or repurposed. The migration is planned to improve
+/// data organization and separation of concerns.
 pub const DEFAULT_COLUMN_FAMILY_NAME: &str = "default";
-const META_COLUMN_FAMILY_NAME: &str = "trie_node";
-const STORAGE_ROOT_COLUMN_FAMILY_NAME: &str = "storage_root";
 
-const COLUMN_FAMILY_NAMES: [&str; 3] = [DEFAULT_COLUMN_FAMILY_NAME, META_COLUMN_FAMILY_NAME, STORAGE_ROOT_COLUMN_FAMILY_NAME];
+/// The column family name used for storing trie nodes.
+///
+/// This column family is the target destination for trie node data migration
+/// from `DEFAULT_COLUMN_FAMILY_NAME`. It stores the actual trie node data,
+/// where each key represents a path prefix in the trie structure, and the
+/// value contains the encoded node data (RLP-encoded or similar format).
+///
+/// # Migration Status
+///
+/// Currently, trie nodes are still stored in `DEFAULT_COLUMN_FAMILY_NAME`.
+/// Future versions will migrate all trie node data to this column family for
+/// better organization and clearer separation from metadata.
+pub const TRIE_NODE_COLUMN_FAMILY_NAME: &str = "trie_node";
 
-/// Metrics for the `TrieDB`.
+/// The column family name used for storing trie metadata.
+///
+/// This column family stores metadata related to the trie state, including:
+/// - State root hash (`TRIE_STATE_ROOT_KEY`)
+/// - Block number (`TRIE_STATE_BLOCK_NUMBER_KEY`)
+pub const META_COLUMN_FAMILY_NAME: &str = "meta_data";
+
+/// The column family name used for storing storage trie roots.
+///
+/// This column family maps account address hashes (Keccak-256 hashed addresses)
+/// to their corresponding storage trie root hashes. Each Ethereum account has
+/// its own storage trie, and this column family maintains the root hash for
+/// each account's storage state.
+///
+/// # Key-Value Format
+///
+/// - **Key**: `B256` (32 bytes) - The Keccak-256 hash of an account address
+/// - **Value**: `B256` (32 bytes) - The root hash of the account's storage trie
+pub const STORAGE_ROOT_COLUMN_FAMILY_NAME: &str = "storage_root";
+
+/// An array containing all column family names used by PathDB.
+///
+/// This array is used during database initialization to ensure all required
+/// column families are created if they don't already exist. The order of
+/// column families in this array is not significant, but all four must be
+/// present for PathDB to function correctly.
+///
+/// # Column Families
+///
+/// 1. `DEFAULT_COLUMN_FAMILY_NAME` - Currently stores trie node data (will be migrated to `TRIE_NODE_COLUMN_FAMILY_NAME`)
+/// 2. `META_COLUMN_FAMILY_NAME` - Stores trie metadata (state root, block number)
+/// 3. `STORAGE_ROOT_COLUMN_FAMILY_NAME` - Stores storage trie roots
+/// 4. `TRIE_NODE_COLUMN_FAMILY_NAME` - Target destination for trie node data migration
+const COLUMN_FAMILY_NAMES: [&str; 4] = [DEFAULT_COLUMN_FAMILY_NAME, META_COLUMN_FAMILY_NAME, STORAGE_ROOT_COLUMN_FAMILY_NAME, TRIE_NODE_COLUMN_FAMILY_NAME];
+
+/// Metrics for the `PathDB`.
 #[derive(Metrics, Clone)]
 #[metrics(scope = "rust.eth.triedb.pathdb")]
 pub(crate) struct PathDBMetrics {
-        /// Counter of cache hits
-        pub(crate) trie_node_cache_hits: Counter,
-        /// Counter of cache misses
-        pub(crate) trie_node_cache_misses: Counter,
-        /// Counter of storage root cache hits
-        pub(crate) storage_root_cache_hits: Counter,
-        /// Counter of storage root cache misses
-        pub(crate) storage_root_cache_misses: Counter,
+    /// Counter of cache hits
+    pub(crate) trie_node_cache_hits: Counter,
+    /// Counter of cache misses
+    pub(crate) trie_node_cache_misses: Counter,
+    /// Counter of storage root cache hits
+    pub(crate) storage_root_cache_hits: Counter,
+    /// Counter of storage root cache misses
+    pub(crate) storage_root_cache_misses: Counter,
 }
 
 /// PathDB implementation using RocksDB.
@@ -191,22 +248,22 @@ impl PathDB {
         let cf = self.db.cf_handle(DEFAULT_COLUMN_FAMILY_NAME).ok_or_else(|| {
             PathProviderError::Database(format!("Column Family '{}' handle not found", DEFAULT_COLUMN_FAMILY_NAME))
         })?;
+        let key_hex = key.iter().map(|b| format!("{:02x}", b)).collect::<String>();
 
         // Cache miss, read from DB
         match self.db.get_cf_opt(&cf, key, &self.read_options) {
             Ok(Some(value)) => {
-                trace!(target: "pathdb::rocksdb", "Found value in DB for key: {:?}", key);
-                // Cache the value
+                trace!(target: "pathdb::rocksdb", "Found value in CF '{}' for key: 0x{}", DEFAULT_COLUMN_FAMILY_NAME, key_hex);
                 self.trie_node_cache.lock().unwrap().insert(key.to_vec(), Some(value.to_vec()));
                 Ok(Some(value))
             }
             Ok(None) => {
-                trace!(target: "pathdb::rocksdb", "Key not found in DB: {:?}", key);
+                trace!(target: "pathdb::rocksdb", "Key not found in CF '{}': 0x{}", DEFAULT_COLUMN_FAMILY_NAME, key_hex);
                 Ok(None)
             }
             Err(e) => {
-                error!(target: "pathdb::rocksdb", "Error getting key {:?}: {}", key, e);
-                Err(PathProviderError::Database(format!("RocksDB get error: {}", e)))
+                error!(target: "pathdb::rocksdb", "Error getting in CF '{}' for key 0x{}: {}", DEFAULT_COLUMN_FAMILY_NAME, key_hex, e);
+                Err(PathProviderError::Database(format!("RocksDB get in CF '{}' for key 0x{} error: {}", DEFAULT_COLUMN_FAMILY_NAME, key_hex, e)))
             }
         }
     }
@@ -221,17 +278,18 @@ impl PathDB {
             PathProviderError::Database(format!("Column Family '{}' handle not found", DEFAULT_COLUMN_FAMILY_NAME))
         })?;
 
+        let key_hex = key.iter().map(|b| format!("{:02x}", b)).collect::<String>();
+
         // Then write to DB
         match self.db.put_cf_opt(&cf, key, value, &self.write_options) {
             Ok(()) => {
-                trace!(target: "pathdb::rocksdb", "Successfully put key: {:?}", key);
+                trace!(target: "pathdb::rocksdb", "Successfully put in CF '{}' for key 0x{}", DEFAULT_COLUMN_FAMILY_NAME, key_hex);
                 Ok(())
             }
             Err(e) => {
-                error!(target: "pathdb::rocksdb", "Error putting key {:?}: {}", key, e);
-                // Remove from cache on error
+                error!(target: "pathdb::rocksdb", "Error putting in CF '{}' for key 0x{}: {}", DEFAULT_COLUMN_FAMILY_NAME, key_hex, e);
                 self.trie_node_cache.lock().unwrap().remove(key);
-                Err(PathProviderError::Database(format!("RocksDB put error: {}", e)))
+                Err(PathProviderError::Database(format!("RocksDB put in CF '{}' for key 0x{} error: {}", DEFAULT_COLUMN_FAMILY_NAME, key_hex, e)))
             }
         }
     }
@@ -246,15 +304,17 @@ impl PathDB {
             PathProviderError::Database(format!("Column Family '{}' handle not found", DEFAULT_COLUMN_FAMILY_NAME))
         })?;
 
+        let key_hex = key.iter().map(|b| format!("{:02x}", b)).collect::<String>();
+
         // Then delete from DB
         match self.db.delete_cf_opt(&cf, key, &self.write_options) {
             Ok(()) => {
-                trace!(target: "pathdb::rocksdb", "Successfully deleted key: {:?}", key);
+                trace!(target: "pathdb::rocksdb", "Successfully deleted in CF '{}' for key 0x{}", DEFAULT_COLUMN_FAMILY_NAME, key_hex);
                 Ok(())
             }
             Err(e) => {
-                error!(target: "pathdb::rocksdb", "Error deleting key {:?}: {}", key, e);
-                Err(PathProviderError::Database(format!("RocksDB delete error: {}", e)))
+                error!(target: "pathdb::rocksdb", "Error deleting in CF '{}' for key 0x{}: {}", DEFAULT_COLUMN_FAMILY_NAME, key_hex, e);
+                Err(PathProviderError::Database(format!("RocksDB delete in CF '{}' for key 0x{} error: {}", DEFAULT_COLUMN_FAMILY_NAME, key_hex, e)))
             }
         }
     }
@@ -278,21 +338,22 @@ impl PathDB {
             PathProviderError::Database(format!("Column Family '{}' handle not found", DEFAULT_COLUMN_FAMILY_NAME))
         })?;
             
+        let key_hex = key.iter().map(|b| format!("{:02x}", b)).collect::<String>();
+
         // Cache miss, check DB
         match self.db.get_cf_opt(&cf, key, &self.read_options) {
             Ok(Some(_)) => {
-                trace!(target: "pathdb::rocksdb", "Key exists in DB: {:?}", key);
-                // Cache the existence
+                trace!(target: "pathdb::rocksdb", "Key exists in CF '{}' for key 0x{}", DEFAULT_COLUMN_FAMILY_NAME, key_hex);
                 self.trie_node_cache.lock().unwrap().insert(key.to_vec(), Some(vec![]));
                 Ok(true)
             }
             Ok(None) => {
-                trace!(target: "pathdb::rocksdb", "Key does not exist in DB: {:?}", key);
+                trace!(target: "pathdb::rocksdb", "Key does not exist in CF '{}' for key 0x{}", DEFAULT_COLUMN_FAMILY_NAME, key_hex);
                 Ok(false)
             }
             Err(e) => {
-                error!(target: "pathdb::rocksdb", "Error checking existence of key {:?}: {}", key, e);
-                Err(PathProviderError::Database(format!("RocksDB exists error: {}", e)))
+                error!(target: "pathdb::rocksdb", "Error checking existence of key in CF '{}' for key 0x{}: {}", DEFAULT_COLUMN_FAMILY_NAME, key_hex, e);
+                Err(PathProviderError::Database(format!("RocksDB exists in CF '{}' for key 0x{} error: {}", DEFAULT_COLUMN_FAMILY_NAME, key_hex, e)))
             }
         }
     }
@@ -316,21 +377,22 @@ impl PathDB {
             PathProviderError::Database(format!("Column Family '{}' handle not found", STORAGE_ROOT_COLUMN_FAMILY_NAME))
         })?;
 
+        let key_hex = key.iter().map(|b| format!("{:02x}", b)).collect::<String>();
+
         // Cache miss, read from DB
         match self.db.get_cf_opt(&cf, key, &self.read_options) {
             Ok(Some(value)) => {
-                trace!(target: "pathdb::rocksdb", "Found value in DB for key: {:?}", key);
-                // Cache the value
+                trace!(target: "pathdb::rocksdb", "Found value in CF '{}' for key 0x{}", STORAGE_ROOT_COLUMN_FAMILY_NAME, key_hex);
                 self.storage_root_cache.lock().unwrap().insert(key.to_vec(), Some(value.to_vec()));
                 Ok(Some(value))
             }
             Ok(None) => {
-                trace!(target: "pathdb::rocksdb", "Key not found in DB: {:?}", key);
+                trace!(target: "pathdb::rocksdb", "Key not found in CF '{}' for key 0x{}", STORAGE_ROOT_COLUMN_FAMILY_NAME, key_hex);
                 Ok(None)
             }
             Err(e) => {
-                error!(target: "pathdb::rocksdb", "Error getting key {:?}: {}", key, e);
-                Err(PathProviderError::Database(format!("RocksDB get error: {}", e)))
+                error!(target: "pathdb::rocksdb", "Error getting in CF '{}' for key 0x{}: {}", STORAGE_ROOT_COLUMN_FAMILY_NAME, key_hex, e);
+                Err(PathProviderError::Database(format!("RocksDB get in CF '{}' for key 0x{} error: {}", STORAGE_ROOT_COLUMN_FAMILY_NAME, key_hex, e)))
             }
         }
     }
@@ -350,19 +412,22 @@ impl PathDB {
             PathProviderError::Database(format!("Column Family '{}' handle not found", DEFAULT_COLUMN_FAMILY_NAME))
         })?;
 
+        // Convert key to readable string: try UTF-8 first, fallback to hex if invalid
+        let key_string = String::from_utf8_lossy(key).to_string();
+        
         match self.db.get_cf_opt(&cf, key, &self.read_options) {
             Ok(Some(value)) => {
-                trace!(target: "pathdb::rocksdb", "Found value in DB for key: {:?}", key);
+                trace!(target: "pathdb::rocksdb", "Found value in CF '{}' for key: {}", DEFAULT_COLUMN_FAMILY_NAME, key_string);
                 self.trie_node_cache.lock().unwrap().insert(key.to_vec(), Some(value.clone()));
                 Ok(Some(value))
             }
             Ok(None) => {
-                trace!(target: "pathdb::rocksdb", "Key not found in DB: {:?}", key);
+                trace!(target: "pathdb::rocksdb", "Key not found in CF '{}' for key: {}", DEFAULT_COLUMN_FAMILY_NAME, key_string);
                 Ok(None)
             }
             Err(e) => {
-                error!(target: "pathdb::rocksdb", "Error getting key {:?}: {}", key, e);
-                Err(PathProviderError::Database(format!("RocksDB get error: {}", e)))
+                error!(target: "pathdb::rocksdb", "Error getting in CF '{}' for key {}: {}", DEFAULT_COLUMN_FAMILY_NAME, key_string, e);
+                Err(PathProviderError::Database(format!("RocksDB get in CF '{}' for key {} error: {}", DEFAULT_COLUMN_FAMILY_NAME, key_string, e)))
             }
         }
     }
@@ -424,7 +489,9 @@ impl TrieDatabase for PathDB {
             if value.len() == 32 {
                 Ok(Some(B256::from_slice(&value)))
             } else {
-                error!(target: "pathdb::rocksdb", "Storage root value length is not 32 for address: {:?}, value_len: {:?}, value: {:?}", hased_address, value.len(), value);
+                let address_hex = format!("0x{:x}", hased_address);
+                let value_hex = value.iter().map(|b| format!("{:02x}", b)).collect::<String>();
+                error!(target: "pathdb::rocksdb", "Storage root value length is not 32 for address: {}, value_len: {}, value: 0x{}", address_hex, value.len(), value_hex);
                 Ok(None)
             }
         } else {
@@ -463,16 +530,18 @@ impl TrieDatabase for PathDB {
             PathProviderError::Database(format!("Column Family '{}' handle not found", STORAGE_ROOT_COLUMN_FAMILY_NAME))
         })?;
 
+        let mut diff_nodes_len = 0;
+        let mut diff_storage_roots_len = 0;
+
         let mut batch = WriteBatch::default();
         {
             let mut trie_node_cache = self.trie_node_cache.lock().unwrap();
             let mut storage_root_cache = self.storage_root_cache.lock().unwrap();
 
-            // Write to default CF using put_cf
             batch.put_cf(&default_cf, TRIE_STATE_ROOT_KEY, state_root.as_slice());
             batch.put_cf(&default_cf, TRIE_STATE_BLOCK_NUMBER_KEY, &block_number.to_le_bytes());
 
-            // Double Write to meta CF using put_cf, will be delete default CF in the future.
+            // TODO:: double Write to meta CF using put_cf, will be delete default CF in the future.
             batch.put_cf(&meta_cf, TRIE_STATE_ROOT_KEY, state_root.as_slice());
             batch.put_cf(&meta_cf, TRIE_STATE_BLOCK_NUMBER_KEY, &block_number.to_le_bytes());
 
@@ -480,6 +549,9 @@ impl TrieDatabase for PathDB {
             trie_node_cache.insert(TRIE_STATE_BLOCK_NUMBER_KEY.to_vec(), Some(block_number.to_le_bytes().to_vec()));
         
             if let Some(difflayer) = difflayer {
+                diff_nodes_len = difflayer.diff_nodes.len();
+                diff_storage_roots_len = difflayer.diff_storage_roots.len();
+
                 for (key, node) in difflayer.diff_nodes.iter() {
                     if node.is_deleted() {
                         trie_node_cache.remove(key);
@@ -502,7 +574,7 @@ impl TrieDatabase for PathDB {
 
         match self.db.write_opt(batch, &self.write_options) {
             Ok(()) => {
-                trace!(target: "pathdb::batch", "Successfully committed batch to database");
+                trace!(target: "pathdb::batch", "Successfully committed batch to database, block_number: {}, state_root: {:?}, diff_nodes_len: {}, diff_storage_roots_len: {}", block_number, state_root, diff_nodes_len, diff_storage_roots_len);
                 Ok(())
             }
             Err(e) => {
