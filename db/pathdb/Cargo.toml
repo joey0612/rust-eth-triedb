@@ -8,17 +8,12 @@ homepage.workspace = true
 repository.workspace = true
 description = "PathDB implementation for RocksDB integration"
 
-[features]
-default = []
-jemalloc = ["tikv-jemallocator"]
-jemalloc-prof = ["tikv-jemallocator?/profiling"]
-
 [dependencies]
 # reth
 rust-eth-triedb-common.workspace = true
 
 # Primitives
-alloy-primitives.workspace = true
+alloy-primitives = { workspace = true }
 alloy-trie.workspace = true
 
 # RocksDB, 
@@ -44,6 +39,12 @@ metrics.workspace = true
 
 # Jemalloc support
 tikv-jemallocator = { workspace = true, optional = true }
+
+[features]
+default = []
+jemalloc = ["tikv-jemallocator"]
+jemalloc-prof = ["tikv-jemallocator?/profiling"]
+asm-keccak = ["alloy-primitives/asm-keccak"]
 
 [dev-dependencies]
 tempfile.workspace = true

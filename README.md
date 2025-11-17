@@ -1,6 +1,6 @@
 ## rust-eth-triedb
 
-High-performance Trie/DB implementations for Ethereum state (MPT), fully compatible with geth’s trie behavior and node types. The project provides COW-based updates, RocksDB-backed persistence, and parallel hashing/commit/update within and across tries.
+High-performance TrieDB implementations for Ethereum state (MPT), fully compatible with geth’s trie behavior and node types. The project provides COW-based updates, RocksDB-backed persistence, and parallel hashing/commit/update within and across tries.
 
 ### Features
 
@@ -10,7 +10,7 @@ High-performance Trie/DB implementations for Ethereum state (MPT), fully compati
 
 - Multiple backends and COW (Copy-On-Write)
   - PathDB (RocksDB): persistent, high-throughput backend with batch writes
-  - MemoryDB: in-memory backend for testing and rapid experimentation
+  - Pluggable backend architecture: any storage backend implementing the `TrieDatabase` trait can be integrated
   - COW strategy between trie and backend to reduce write amplification and unnecessary copies
 
 - Parallel hash/commit/update
@@ -23,10 +23,14 @@ High-performance Trie/DB implementations for Ethereum state (MPT), fully compati
   - Use `--features jemalloc` to enable during compilation
   - Provides improved memory fragmentation handling and multi-threaded performance
 
+- **ASM Keccak support (optional)**
+  - Replace the default pure-Rust Keccak256 implementation with an assembly-optimized version for significant hash computation performance improvements
+  - Use `--features asm-keccak` to enable during compilation
+  - Leverages CPU-specific instruction sets to accelerate cryptographic hashing operations, which is critical for trie node hashing and state root calculations
+
 ### Project layout
 
 - `common/`: shared interfaces and types (e.g., `TrieDatabase` abstraction)
-- `db/memorydb/`: in-memory database
 - `db/pathdb/`: RocksDB-backed PathDB
 - `state-trie/`: secure state trie core (key hashing, node structures, encoding/hashing, commit)
 - `triedb/` external interface for managing account and storage tries
@@ -41,7 +45,7 @@ High-performance Trie/DB implementations for Ethereum state (MPT), fully compati
 cargo build --workspace
 
 # Build with jemalloc support (recommended for production)
-cargo build --workspace --features jemalloc
+cargo build --workspace --features jemalloc,asm-keccak
 ```
 
 2) Smoke Test (random updates and deletes, compare the root hash with geth)
@@ -72,53 +76,58 @@ cargo test --workspace
 Here's a step-by-step example demonstrating the basic usage of TrieDB:
 
 ```rust
-use rust_eth_triedb::triedb::{TrieDB, TrieDBTrait};
-use rust_eth_triedb::db::pathdb::{PathDB, PathProviderConfig};
-use rust_eth_triedb::state_trie::account::StateAccount;
-use alloy_primitives::{Address, B256};
+use rust_eth_triedb::{init_global_manager, get_global_triedb};
+use reth_trie_common::{HashedPostState, HashedStorage};
+use reth_primitives_traits::Account;
+use alloy_primitives::{keccak256, Address, B256, U256};
 use std::str::FromStr;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // 1. Initialize PathDB and TrieDB
-    let config = PathProviderConfig::default();
-    let db = PathDB::new("/path/to/database", config)?;
-    let mut triedb = TrieDB::new(db);
+    // 1. Initialize the global TrieDB manager with database path
+    init_global_manager("/path/to/database");
     
-    // 2. Call state_at function to set a state
-    let state_root = B256::ZERO; // or any existing state root
-    triedb.state_at(state_root)?;
+    // 2. Get the global TrieDB instance
+    let mut triedb = get_global_triedb();
     
-    // 3. Declare a StateAccount and call update_account
+    // 3. Prepare account data
     let address = Address::from_str("0x1234567890123456789012345678901234567890")?;
-    let mut account = StateAccount::default();
-    account.balance = 1000000000000000000u128.into(); // 1 ETH
-    account.nonce = 1;
+    let hashed_address = keccak256(address);
     
-    triedb.update_account(address, &account)?;
+    // Create account with balance and nonce
+    let account = Account {
+        balance: U256::from(1000000000000000000u128), // 1 ETH
+        nonce: 1,
+        bytecode_hash: Some(B256::ZERO),
+    };
     
-    // 4. Update storage for this account's address
-    let storage_key = b"balance";
-    let storage_value = b"1000000000000000000";
-    triedb.update_storage(address, storage_key, storage_value)?;
+    // 4. Prepare storage data
+    let storage_key = keccak256(b"balance");
+    let storage_value = U256::from(1000000000000000000u128);
     
-    // 5. Calculate hash
-    let calculated_hash = triedb.calculate_hash()?;
-    println!("Calculated hash: {:?}", calculated_hash);
+    // Create hashed storage with storage entries
+    let hashed_storage = HashedStorage::from_iter(
+        false, // wiped = false
+        vec![(storage_key, storage_value)]
+    );
     
-    // 6. Commit changes
-    let (root_hash, node_set) = triedb.commit(true)?;
+    // 5. Organize data into HashedPostState
+    let hashed_post_state = HashedPostState::default()
+        .with_accounts(vec![(hashed_address, Some(account))])
+        .with_storages(vec![(hashed_address, hashed_storage)]);
+    
+    // 6. Commit the hashed post state
+    let state_root = B256::ZERO; // or any existing state root
+    let (root_hash, difflayer) = triedb.commit_hashed_post_state(
+        state_root,
+        None, // no previous difflayer
+        &hashed_post_state
+    )?;
     println!("Committed root hash: {:?}", root_hash);
     
-    // Alternative: Use update_and_commit to combine the above operations
-    // let mut states = HashMap::new();
-    // states.insert(keccak256(address.as_slice()), Some(account));
-    // 
-    // let mut storage_states = HashMap::new();
-    // let mut storage_kvs = HashMap::new();
-    // storage_kvs.insert(keccak256(storage_key), Some(storage_value.to_vec()));
-    // storage_states.insert(keccak256(address.as_slice()), storage_kvs);
-    // 
-    // let (root_hash, node_set) = triedb.update_and_commit(state_root, None, states, storage_states)?;
+    // 7. Flush changes to persistent storage
+    let block_number = 1;
+    triedb.flush(block_number, root_hash, &difflayer)?;
+    println!("Flushed block {} to persistent storage", block_number);
     
     Ok(())
 }
