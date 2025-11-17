@@ -6,6 +6,7 @@
 //! - Iterators
 //! - Snapshots
 //! - Thread safety
+//! - Column Family support for sharding/partitioning
 
 pub mod pathdb;
 pub mod traits;

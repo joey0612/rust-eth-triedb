@@ -9,7 +9,48 @@ use super::node::{NodeSet};
 /// Error type for secure trie operations
 pub type SecureTrieError = super::secure_trie::SecureTrieError;
 
-/// Trait for secure trie operations
+/// A trait defining the interface for secure trie operations.
+///
+/// `SecureTrieTrait` provides a unified abstraction for interacting with Ethereum-compatible
+/// state tries that use secure key hashing. This trait defines all operations needed to
+/// manage accounts and storage in an Ethereum-style state trie, where all keys are
+/// hashed using Keccak-256 before being stored.
+///
+/// This trait is designed to be compatible with Ethereum's state trie specification
+/// and can be used with Ethereum-compatible blockchain networks, including BSC and
+/// other EVM-compatible chains.
+///
+/// # Key Features
+///
+/// - **Account Management**: Get, update, and delete Ethereum accounts from the state trie
+/// - **Storage Management**: Read and write storage values for accounts with automatic
+///   key hashing
+/// - **Hash-based Operations**: Support for operations using pre-hashed keys, which can
+///   be more efficient when keys are already hashed
+/// - **State Persistence**: Commit operations to persist state changes and obtain the
+///   modified node set for database updates
+///
+/// # Method Categories
+///
+/// The trait provides two sets of methods:
+///
+/// 1. **Address-based methods**: Operations that take raw `Address` or `&[u8]` keys,
+///    which are automatically hashed internally using Keccak-256.
+///
+/// 2. **Hash-based methods**: Operations that take pre-hashed `B256` keys, allowing
+///    for more efficient operations when keys are already hashed (e.g., when working
+///    with storage roots or when keys have been pre-computed).
+///
+/// # Type Parameters
+///
+/// * `Error` - The error type returned by trie operations. Implementations should
+///   define their own error types that capture operation-specific failures.
+///
+/// # Thread Safety
+///
+/// Methods in this trait take `&mut self`, indicating that implementations are not
+/// inherently thread-safe. Concurrent access should be protected by appropriate
+/// synchronization primitives.
 pub trait SecureTrieTrait {
     /// Associated error type
     type Error;

@@ -5,6 +5,7 @@ use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
 use crate::secure_trie::{SecureTrieBuilder, SecureTrieId};
 use crate::traits::SecureTrieTrait;
 use super::node::init_empty_root_node;
+use alloy_trie::{EMPTY_ROOT_HASH};
 use std::env;
 
 #[test]
@@ -1784,7 +1785,7 @@ fn test_hash_slice_explanation() {
 
 #[test]
 fn test_key_to_nibbles_bsc_compatibility() {
-    use rust_eth_triedb_memorydb::MemoryDB;
+    use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
     use crate::trie::Trie;
     use alloy_primitives::hex;
 
@@ -1792,7 +1793,11 @@ fn test_key_to_nibbles_bsc_compatibility() {
     println!("🧪 Testing key_to_nibbles BSC compatibility...");
 
     // Create a trie instance to test the method
-    let db = MemoryDB::new();
+    let temp_dir = env::temp_dir().join("trie_test_key_to_nibbles");
+    let db_path = temp_dir.to_str().unwrap();
+    let config = PathProviderConfig::default();
+    let db = PathDB::new(db_path, config)
+        .expect("Failed to create PathDB");
     let trie_id = crate::SecureTrieId::default();
     let _trie = Trie::new(&trie_id, db, None).expect("Failed to create trie");
 
@@ -1879,15 +1884,19 @@ fn test_key_to_nibbles_bsc_compatibility() {
 
 #[test]
 fn test_update_and_get_storage_basic() {
-    use rust_eth_triedb_memorydb::MemoryDB;
+    use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
     use crate::state_trie::StateTrie;
     use crate::secure_trie::SecureTrieId;
     use alloy_primitives::{Address, B256};
 
-    // Create empty in-memory DB and StateTrie
-    let db = MemoryDB::default();
+    // Create PathDB and StateTrie
+    let temp_dir = env::temp_dir().join("trie_test_storage_basic");
+    let db_path = temp_dir.to_str().unwrap();
+    let config = PathProviderConfig::default();
+    let db = PathDB::new(db_path, config)
+        .expect("Failed to create PathDB");
     let id = SecureTrieId::new(B256::ZERO);
-    let mut state_trie: StateTrie<MemoryDB> = StateTrie::new(id, db, None).expect("create trie");
+    let mut state_trie: StateTrie<PathDB> = StateTrie::new(id, db, None).expect("create trie");
 
     let address = Address::ZERO;
     let key = b"storage_key";
@@ -1903,14 +1912,18 @@ fn test_update_and_get_storage_basic() {
 
 #[test]
 fn test_update_and_get_storage_various_sizes() {
-    use rust_eth_triedb_memorydb::MemoryDB;
+    use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
     use crate::state_trie::StateTrie;
     use crate::secure_trie::SecureTrieId;
     use alloy_primitives::{Address, B256};
 
-    let db = MemoryDB::default();
+    let temp_dir = env::temp_dir().join("trie_test_storage_sizes");
+    let db_path = temp_dir.to_str().unwrap();
+    let config = PathProviderConfig::default();
+    let db = PathDB::new(db_path, config)
+        .expect("Failed to create PathDB");
     let id = SecureTrieId::new(B256::ZERO);
-    let mut trie: StateTrie<MemoryDB> = StateTrie::new(id, db, None).expect("create trie");
+    let mut trie: StateTrie<PathDB> = StateTrie::new(id, db, None).expect("create trie");
 
     let addr = Address::ZERO;
     let key = b"size_key";
@@ -2137,4 +2150,81 @@ fn test_u256_storage_with_hash_state() {
     }
     
     println!("=== U256 Storage Test Completed Successfully ===");
+}
+
+#[test]
+fn test_trie_empty_root_with_10_keys() {
+    init_empty_root_node();
+
+    // Create temporary directory path
+    let temp_dir = env::temp_dir().join("trie_test_empty_root");
+    let db_path = temp_dir.to_str().unwrap();
+
+    // Create PathDB database
+    let config = PathProviderConfig::default();
+    let db = PathDB::new(db_path, config)
+        .expect("Failed to create PathDB");
+
+    // Create SecureTrieId
+    let id = SecureTrieId::new(B256::ZERO);
+
+    // Create Trie instance
+    let mut state_trie = SecureTrieBuilder::new(db.clone())
+        .with_id(id.clone())
+        .build_with_difflayer(None)
+        .expect("Failed to create trie");
+
+    let trie = state_trie.trie_mut();
+
+    // Define 10 test keys and values
+    let test_data = vec![
+        (b"key1".as_slice(), b"value1".as_slice()),
+        (b"key2".as_slice(), b"value2".as_slice()),
+        (b"key3".as_slice(), b"value3".as_slice()),
+        (b"key4".as_slice(), b"value4".as_slice()),
+        (b"key5".as_slice(), b"value5".as_slice()),
+        (b"key6".as_slice(), b"value6".as_slice()),
+        (b"key7".as_slice(), b"value7".as_slice()),
+        (b"key8".as_slice(), b"value8".as_slice()),
+        (b"key9".as_slice(), b"value9".as_slice()),
+        (b"key10".as_slice(), b"value10".as_slice()),
+    ];
+
+    println!("=== Testing Empty Root with 10 Keys ===");
+    
+    // Insert all 10 keys
+    for (i, (key, value)) in test_data.iter().enumerate() {
+        println!("Inserting key{}: {} -> {}", i + 1, String::from_utf8_lossy(key), String::from_utf8_lossy(value));
+        
+        trie.update(key, value)
+            .expect(&format!("Failed to update trie with key{}", i + 1));
+    }
+
+    // Now delete all 10 keys to make the trie empty
+    println!("\nDeleting all keys to achieve empty state...");
+    for (i, (key, _)) in test_data.iter().enumerate() {
+        println!("Deleting key{}: {}", i + 1, String::from_utf8_lossy(key));
+        
+        // Delete by setting value to empty
+        trie.update(key, b"")
+            .expect(&format!("Failed to delete key{}", i + 1));
+    }
+
+    // Calculate the root hash
+    let root_hash = trie.hash();
+
+    // The empty root hash should be the keccak256 of the empty string
+    let expected_empty_root = EMPTY_ROOT_HASH;
+    
+    println!("\n=== Results ===");
+    println!("Calculated root hash: {:?}", root_hash);
+    println!("Expected empty root:  {:?}", expected_empty_root);
+    
+    // Verify that the root hash is the empty root
+    assert_eq!(root_hash, expected_empty_root, 
+        "Root hash should be empty root after deleting all keys. Expected: {:?}, Got: {:?}", 
+        expected_empty_root, root_hash);
+
+    println!("✅ Empty root verification passed!");
+    println!("=== Empty Root Test Completed Successfully ===");
 }

@@ -17,8 +17,9 @@ jemalloc-prof = ["tikv-jemallocator?/profiling"]
 # reth
 rust-eth-triedb-common.workspace = true
 
-# alloy
-alloy-primitives = { workspace = true, features = ["asm-keccak"] }
+# Primitives
+alloy-primitives.workspace = true
+alloy-trie.workspace = true
 
 # RocksDB, 
 rocksdb = { workspace = true, features = ["multi-threaded-cf", "io-uring", "jemalloc"] }

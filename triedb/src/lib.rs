@@ -4,13 +4,14 @@
 // This crate supports jemalloc feature for dependency resolution but doesn't define global allocator
 
 pub mod triedb;
+pub mod triedb_basic;
 pub mod triedb_manager;
+pub mod triedb_metrics;
+pub mod triedb_disk;
+pub mod triedb_reth;
 
 #[cfg(test)]
 mod triedb_test;
-
-#[cfg(test)]
-mod triedb_simple_test;
 
 // Re-export main types
 pub use triedb::TrieDB;

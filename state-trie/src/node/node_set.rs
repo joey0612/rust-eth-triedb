@@ -7,52 +7,8 @@ use std::sync::Arc;
 use std::collections::HashMap;
 
 use alloy_primitives::B256;
+use rust_eth_triedb_common::{Leaf, TrieNode};
 use crate::encoding;
-
-/// Represents a trie node with its hash and encoded data
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TrieNode {
-    /// Node hash, empty for deleted node
-    pub hash: Option<B256>,
-    /// Encoded node data, empty for deleted node
-    pub blob: Option<Vec<u8>>,
-}
-
-impl TrieNode {
-    /// Creates a new trie node
-    pub fn new(hash: Option<B256>, blob: Option<Vec<u8>>) -> Self {
-        Self { hash, blob }
-    }
-
-    /// Creates a default trie node
-    pub fn default() -> Self {
-        Self { hash: None, blob: None }
-    }
-
-    /// Returns true if this node is marked as deleted
-    pub fn is_deleted(&self) -> bool {
-        self.blob.is_none() || (self.blob.is_some() && self.blob.as_ref().unwrap().is_empty())
-    }
-
-    /// Returns the total memory size used by this node
-    pub fn size(&self) -> usize {
-        if self.is_deleted() {
-            return 0;
-        }
-        self.blob.as_ref().unwrap().len() + 32 // 32 bytes for hash
-    }
-}
-
-/// Leaf node representation
-#[derive(Debug, Clone)]
-struct Leaf {
-    /// Raw blob of leaf
-    #[allow(dead_code)]
-    blob: Vec<u8>,
-    /// Hash of parent node
-    #[allow(dead_code)]
-    parent: B256,
-}
 
 /// NodeSet contains a set of nodes collected during the commit operation.
 /// Each node is keyed by path. It's not thread-safe to use.
@@ -79,17 +35,6 @@ impl NodeSet {
             nodes: HashMap::new(),
             updates: 0,
             deletes: 0,
-        }
-    }
-
-    pub fn for_each_with_order(&self, f: &mut impl FnMut(String, &TrieNode)) {
-        let mut paths = self.nodes.keys().collect::<Vec<_>>();
-        // Bottom-up, the longest path first: reverse lexicographic order
-        paths.sort_unstable_by(|a, b| b.cmp(a));
-        for path in paths {
-            if let Some(node) = self.nodes.get(path) {
-                f(path.clone(), node);
-            }
         }
     }
 
@@ -127,20 +72,6 @@ impl NodeSet {
         &self.nodes
     }
 
-    /// Returns a mutable reference to the nodes map
-    pub fn nodes_mut(&mut self) -> &mut HashMap<String, Arc<TrieNode>> {
-        &mut self.nodes
-    }
-
-    /// Returns a set of trie nodes keyed by node hash
-    pub fn hash_set(&self) -> HashMap<B256, Vec<u8>> {
-        let mut ret = HashMap::new();
-        for node in self.nodes.values() {
-            ret.insert(node.hash.unwrap(), node.blob.clone().unwrap());
-        }
-        ret
-    }
-
     /// MergeSet merges this 'set' with 'other'. It assumes that the sets are disjoint,
     /// and thus does not deduplicate data (count deletes, dedup leaves etc).
     pub fn merge_set(&mut self, other: &NodeSet) -> Result<(), String> {
@@ -158,33 +89,6 @@ impl NodeSet {
 
         Ok(())
     }
-
-    /// Merges another node set into this one
-    // pub fn merge(&mut self, owner: B256, nodes: HashMap<String, TrieNode>) -> Result<(), String> {
-    //     if self.owner != owner {
-    //         return Err(format!(
-    //             "nodesets belong to different owner are not mergeable {:?}-{:?}",
-    //             self.owner, owner
-    //         ));
-    //     }
-
-    //     for (path, node) in &nodes {
-    //         if let Some(prev_node) = self.nodes.get(path) {
-    //             if prev_node.is_deleted() {
-    //                 self.deletes -= 1;
-    //             } else {
-    //                 self.updates -= 1;
-    //             }
-    //         }
-    //         if node.is_deleted() {
-    //             self.deletes += 1;
-    //         } else {
-    //             self.updates += 1;
-    //         }
-    //         self.nodes.insert(path.clone(), node.clone());
-    //     }
-    //     return Ok(());
-    // }
 
     /// Returns true if the node set is empty
     pub fn is_empty(&self) -> bool {
@@ -301,8 +205,6 @@ impl std::fmt::Debug for NodeSet {
     }
 }
 
-/// Alias for difflayer node mapping
-pub type DiffLayer = HashMap<Vec<u8>, Arc<TrieNode>>;
 
 /// MergedNodeSet is a set of node sets that are merged together.
 #[derive(Debug, Clone)]
@@ -321,14 +223,6 @@ impl MergedNodeSet {
     /// Merge a node set into the merged set
     #[allow(dead_code)]
     pub fn merge(&mut self, other: Arc<NodeSet>) -> Result<(), String> {
-        // let subset = self.sets.get_mut(&other.owner);
-        // if let Some(subset) = subset {
-        //     // Clone the Arc to get a mutable reference
-        //     let subset_clone = Arc::get_mut(subset).unwrap();
-        //     subset_clone.merge(other.owner, other.nodes.clone())?;
-        // } else {
-        //     self.sets.insert(other.owner, other.clone());
-        // }
         if self.sets.contains_key(&other.owner) {
             panic!("repeated nodeset to merge, owner: {:?} already exists", other.owner);
         }
@@ -336,20 +230,9 @@ impl MergedNodeSet {
         Ok(())
     }
 
-    /// Flatten the merged set into a single map of nodes
-    // #[allow(dead_code)]
-    // pub fn flatten(&self) -> HashMap<B256, HashMap<String, TrieNode>> {
-    //     let mut nodes: HashMap<B256, HashMap<String, TrieNode>> =
-    //         HashMap::with_capacity(self.sets.len());
-    //     for (owner, set) in &self.sets {
-    //         nodes.insert(*owner, set.nodes.clone());
-    //     }
-    //     nodes
-    // }
-
     /// Convert the merged node set to a difflayer
-    pub fn to_difflayer(&self) -> Arc<DiffLayer> {
-        let mut difflayer = DiffLayer::new();
+    pub fn to_diff_nodes(&self) -> Arc<HashMap<Vec<u8>, Arc<TrieNode>>> {
+        let mut difflayer = HashMap::new();
         for (owner, set) in &self.sets {
             for (path, node) in &set.nodes {
                 if owner == &B256::ZERO {
@@ -386,23 +269,5 @@ mod tests {
         set.add_node(b"def", Arc::new(TrieNode::new(Some(B256::ZERO), Some(Vec::new())))); // deleted
         assert_eq!(set.size(), (1, 1));
         assert_eq!(set.nodes().len(), 2);
-    }
-
-    #[test]
-    fn nodeset_for_each_with_order_reverse_lex() {
-        let mut set = NodeSet::new(B256::ZERO);
-        set.add_node(b"abc", make_node(1, b"v1"));
-        set.add_node(b"abcd", make_node(2, b"v2"));
-        set.add_node(b"abb", make_node(3, b"v3"));
-
-        let mut visited: Vec<String> = Vec::new();
-        set.for_each_with_order(&mut |path, _| visited.push(path));
-
-        // Reverse lexicographic order ensures longer prefix comes first
-        assert_eq!(visited, vec![
-            "abcd".to_string(),
-            "abc".to_string(),
-            "abb".to_string(),
-        ]);
     }
 }

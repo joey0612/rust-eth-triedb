@@ -6,4 +6,7 @@
 /// Database traits for trie operations.
 mod traits;
 pub use traits::TrieDatabase;
-pub use traits::TrieDatabaseBatch;
+
+/// DiffLayer types for tracking trie node changes.
+mod difflayer;
+pub use difflayer::{Leaf, TrieNode, DiffLayer, DiffLayers, TRIE_STATE_ROOT_KEY, TRIE_STATE_BLOCK_NUMBER_KEY};

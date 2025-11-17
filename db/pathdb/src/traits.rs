@@ -1,8 +1,6 @@
 //! PathProvider trait definitions for key-value database operations.
 
-use std::collections::HashMap;
 use std::fmt::Debug;
-use std::sync::Arc;
 
 // Default configuration constants
 pub const DEFAULT_MAX_OPEN_FILES: i32 = 10000000;
@@ -11,7 +9,8 @@ pub const DEFAULT_MAX_WRITE_BUFFER_NUMBER: i32 = 4;
 pub const DEFAULT_TARGET_FILE_SIZE_BASE: u64 = 64 * 1024 * 1024; // 64MB
 pub const DEFAULT_MAX_BACKGROUND_JOBS: i32 = 4;
 pub const DEFAULT_CREATE_IF_MISSING: bool = true;
-pub const DEFAULT_CACHE_SIZE: u32 = 20_000_000; // 2KM entries
+pub const DEFAULT_TRIE_NODECACHE_SIZE: u32 = 20_000_000; // 2KW entries
+pub const DEFAULT_STORAGE_ROOT_CACHE_SIZE: u32 = 200_000_000; // 20KW entries
 
 // ReadOptions configuration constants
 pub const DEFAULT_FILL_CACHE: bool = true;
@@ -39,35 +38,8 @@ pub enum PathProviderError {
     InvalidOperation(String),
 }
 
-/// Trait for basic key-value database operations.
-pub trait PathProvider: Send + Sync + Debug {
-    /// Get a value by key.
-    fn get_raw(&self, key: &[u8]) -> PathProviderResult<Option<Vec<u8>>>;
-
-    /// Put a key-value pair.
-    fn put_raw(&self, key: &[u8], value: &[u8]) -> PathProviderResult<()>;
-
-    /// Delete a key.
-    fn delete_raw(&self, key: &[u8]) -> PathProviderResult<()>;
-
-    /// Check if a key exists.
-    fn exists_raw(&self, key: &[u8]) -> PathProviderResult<bool>;
-
-    /// Get multiple values by keys.
-    fn get_multi(&self, keys: &[Vec<u8>]) -> PathProviderResult<HashMap<Vec<u8>, Vec<u8>>>;
-
-    /// Put multiple key-value pairs.
-    fn put_multi(&self, kvs: &[(Vec<u8>, Vec<u8>)]) -> PathProviderResult<()>;
-
-    /// Delete multiple keys.
-    fn delete_multi(&self, keys: &[Vec<u8>]) -> PathProviderResult<()>;
-}
-
 /// Trait for database management operations.
 pub trait PathProviderManager: Send + Sync + Debug {
-    /// Open or create a database at the given path.
-    fn open(path: &str) -> PathProviderResult<Arc<dyn PathProvider>>;
-
     /// Close the database.
     fn close(&self) -> PathProviderResult<()>;
 
@@ -94,7 +66,9 @@ pub struct PathProviderConfig {
     /// Whether to create the database if it doesn't exist.
     pub create_if_missing: bool,
     /// LRU cache size in number of entries (default: 1M entries).
-    pub cache_size: u32,
+    pub trie_node_cache_size: u32,
+    /// LRU cache size in number of entries (default: 1M entries).
+    pub storage_root_cache_size: u32,
     /// Whether to fill cache on reads.
     pub fill_cache: bool,
     /// Readahead size in bytes for sequential reads.
@@ -114,7 +88,8 @@ impl Default for PathProviderConfig {
             target_file_size_base: DEFAULT_TARGET_FILE_SIZE_BASE,
             max_background_jobs: DEFAULT_MAX_BACKGROUND_JOBS,
             create_if_missing: DEFAULT_CREATE_IF_MISSING,
-            cache_size: DEFAULT_CACHE_SIZE,
+            trie_node_cache_size: DEFAULT_TRIE_NODECACHE_SIZE,
+            storage_root_cache_size: DEFAULT_STORAGE_ROOT_CACHE_SIZE,
             fill_cache: DEFAULT_FILL_CACHE,
             readahead_size: DEFAULT_READAHEAD_SIZE,
             async_io: DEFAULT_ASYNC_IO,

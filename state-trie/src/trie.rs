@@ -7,7 +7,7 @@ use alloy_trie::EMPTY_ROOT_HASH;
 use rust_eth_triedb_common::TrieDatabase;
 use crate::trie_committer::Committer;
 use super::encoding::{common_prefix_length, key_to_nibbles, account_trie_node_key, storage_trie_node_key};
-use super::node::{Node, NodeFlag, FullNode, ShortNode, NodeSet, TrieNode, DiffLayer};
+use super::node::{Node, NodeFlag, FullNode, ShortNode, NodeSet, TrieNode, DiffLayers};
 use super::secure_trie::{SecureTrieId, SecureTrieError};
 use super::trie_hasher::Hasher;
 use super::trie_tracer::TrieTracer;
@@ -22,7 +22,7 @@ pub struct Trie<DB> {
     uncommitted: usize,
     pub tracer: TrieTracer,
     database: DB,
-    difflayer: Option<Arc<DiffLayer>>,
+    difflayers: Option<DiffLayers>,
 }
 
 /// Basic Trie operations
@@ -32,7 +32,7 @@ where
     DB::Error: std::fmt::Debug,
 {
     /// Creates a new trie with the given identifier and database
-    pub fn new(id: &SecureTrieId, database: DB, difflayer: Option<&Arc<DiffLayer>>) -> Result<Self, SecureTrieError> {
+    pub fn new(id: &SecureTrieId, database: DB, difflayer: Option<&DiffLayers>) -> Result<Self, SecureTrieError> {
         let mut tr = Self {
             root: Node::empty_root(),
             owner: id.owner,
@@ -41,7 +41,7 @@ where
             uncommitted: 0,
             tracer: TrieTracer::new(),
             database,
-            difflayer: difflayer.map(|d| d.clone()),
+            difflayers: difflayer.map(|d| d.clone()),
         };
 
         // Check if this is an empty trie (root is EmptyRootHash)
@@ -726,20 +726,23 @@ where
         };
         
         // 1. Check if the hash is in the difflayer
-        if let Some(difflayer) = &self.difflayer {
-            if let Some(node) = difflayer.get(&key) {
+        if let Some(difflayers) = &self.difflayers {
+            if let Some(node) = difflayers.get_trie_nodes(key.clone()) {
                 self.tracer.on_read(prefix, node.blob.clone().unwrap());              
                 return Ok(Node::must_decode_node(Some(*hash), &node.blob.clone().unwrap()));
-            }
+            }           
         }
 
         // 2. Check if the hash is in the database
-        if let Some(node_blob) = self.database.get(&key).map_err(|e| SecureTrieError::Database(format!("{:?}", e)))? {
+        if let Some(node_blob) = self.database.get_trie_node(&key).map_err(|e| SecureTrieError::Database(format!("{:?}", e)))? {
             self.tracer.on_read(prefix, node_blob.clone());
             return Ok(Node::must_decode_node(Some(*hash), &node_blob));
         }
 
-        return Err(SecureTrieError::Database(format!("Node not found in database: owner: {:?}, prefix: {:?}, key: {:?}", self.owner, prefix, key)));
+        let owner_hex = format!("0x{:x}", self.owner);
+        let prefix_hex = prefix.iter().map(|b| format!("{:02x}", b)).collect::<String>();
+        let key_hex = key.iter().map(|b| format!("{:02x}", b)).collect::<String>();
+        return Err(SecureTrieError::Database(format!("missing trie node: owner: {}, prefix: 0x{}, key: 0x{}", owner_hex, prefix_hex, key_hex)));
     }
 
 }

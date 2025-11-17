@@ -22,5 +22,7 @@ pub mod rlp_raw;
 // Re-export main types
 pub use full_node::FullNode;
 pub use node::{HashNode, Node, NodeFlag, ValueNode, init_empty_root_node, get_empty_root_node};
-pub use node_set::{NodeSet, TrieNode, MergedNodeSet, DiffLayer};
+pub use node_set::{NodeSet, MergedNodeSet};
 pub use short_node::ShortNode;
+// Re-export TrieNode, DiffLayer, DiffLayers from common crate
+pub use rust_eth_triedb_common::{TrieNode, DiffLayer, DiffLayers};

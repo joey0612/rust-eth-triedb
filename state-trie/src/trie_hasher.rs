@@ -398,7 +398,11 @@ mod tests {
         println!("   - Keys per batch: 100,000");
         println!("   - Delete per batch: 20,000");
 
-        let db = rust_eth_triedb_memorydb::MemoryDB::default();
+        let temp_dir = std::env::temp_dir().join("trie_test_large_scale");
+        let db_path = temp_dir.to_str().unwrap();
+        let config = rust_eth_triedb_pathdb::PathProviderConfig::default();
+        let db = rust_eth_triedb_pathdb::PathDB::new(db_path, config)
+            .expect("Failed to create PathDB");
         let id = SecureTrieId::new(B256::ZERO);
 
         let mut state_trie = SecureTrieBuilder::new(db.clone())

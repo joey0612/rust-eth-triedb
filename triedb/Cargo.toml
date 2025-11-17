@@ -26,6 +26,9 @@ alloy-trie.workspace = true
 reth-trie-common.workspace = true
 reth-metrics = { workspace = true, features = ["common"] }
 
+# LRU Cache
+schnellru.workspace = true
+
 # metrics (required by reth-metrics derive macro)
 metrics.workspace = true
 
@@ -35,6 +38,7 @@ thiserror.workspace = true
 serde = { version = "1.0", features = ["derive"] }
 rayon.workspace = true
 once_cell = "1.19"
+tracing.workspace = true
 
 # Jemalloc support
 tikv-jemallocator = { workspace = true, optional = true }

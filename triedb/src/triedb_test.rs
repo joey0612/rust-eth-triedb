@@ -4,7 +4,7 @@ use std::str::FromStr;
 use alloy_primitives::{keccak256, Address, B256, U256};
 use alloy_trie::{EMPTY_ROOT_HASH};
 use rust_eth_triedb_state_trie::account::StateAccount;
-use rust_eth_triedb_state_trie::node::{MergedNodeSet, init_empty_root_node};
+use rust_eth_triedb_state_trie::node::{MergedNodeSet, DiffLayer, DiffLayers, init_empty_root_node};
 use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
 use crate::{TrieDB, TrieDBError};
 use tempfile::TempDir;
@@ -17,14 +17,13 @@ use serial_test::serial;
 fn test_triedb_update_all_operations_without_difflayer() {
     init_empty_root_node();
 
-    // Create temporary directory for database
-    let temp_dir = TempDir::new().expect("Failed to create temp directory");
-    let db_path = temp_dir.path().to_str().unwrap();
+    // Create temporary directories for databases
+    let path_db_temp_dir = TempDir::new().expect("Failed to create temp directory for PathDB");
+    let path_db_path = path_db_temp_dir.path().to_str().unwrap();
     
     // Create path database and TrieDB instance
-    let config = PathProviderConfig::default();
-    let db = PathDB::new(db_path, config).expect("Failed to create PathDB");
-    let mut triedb = TrieDB::new(db);
+    let path_db = PathDB::new(path_db_path, PathProviderConfig::default()).expect("Failed to create PathDB");
+    let mut triedb = TrieDB::new(path_db);
     
     println!("=== Starting TrieDB Test ===");
     
@@ -41,14 +40,13 @@ fn test_triedb_update_all_operations_without_difflayer() {
 #[serial]
 fn test_triedb_update_all_operations_with_difflayer() {
     init_empty_root_node();
-    // Create temporary directory for database
-    let temp_dir = TempDir::new().expect("Failed to create temp directory");
-    let db_path = temp_dir.path().to_str().unwrap();
+    // Create temporary directories for databases
+    let path_db_temp_dir = TempDir::new().expect("Failed to create temp directory for PathDB");
+    let path_db_path = path_db_temp_dir.path().to_str().unwrap();
     
     // Create path database and TrieDB instance
-    let config = PathProviderConfig::default();
-    let db = PathDB::new(db_path, config).expect("Failed to create PathDB");
-    let mut triedb = TrieDB::new(db);
+    let path_db = PathDB::new(path_db_path, PathProviderConfig::default()).expect("Failed to create PathDB");
+    let mut triedb = TrieDB::new(path_db);
     
     println!("=== Starting TrieDB Test With Difflayer===");
     
@@ -100,47 +98,44 @@ fn test_update_all_initial(triedb: &mut TrieDB<PathDB>) -> Result<(B256, Option<
     println!("Constructed {} storage states", storage_states.len());
     
     // Call update_all interface
-    let result = triedb.update_and_commit(EMPTY_ROOT_HASH, None, states, HashSet::new(), storage_states);
+    let result = triedb.batch_update_and_commit(EMPTY_ROOT_HASH, None, states, HashSet::new(), storage_states);
     match &result {
-        Ok((root_hash, node_set)) => {            
+        Ok((root_hash, node_set, diff_storage_roots)) => {    
             // Assert that root_hash matches BSC implementation result
             let expected_hash = B256::from_str("0xadcc848b76bace28ea81dd449a735bad44663a36f18f40980d586d5315eb3800")
                 .expect("Failed to parse expected hash");
             assert_eq!(*root_hash, expected_hash, "Root hash should match BSC implementation");
             println!("✅ Root hash assertion passed: matches BSC implementation, root hash: {:?}", root_hash);
 
-            if let Some(nodes) = node_set {
-                for (owner, nodes) in nodes.sets.iter() {                    
-                    if let Some(expected_signature) = BSC_SIGNATURES_ONE.get(owner) {
-                        assert_eq!(
-                            nodes.signature(), 
-                            *expected_signature, 
-                            "Signature for owner {:?} should match BSC implementation", 
-                            owner
-                        );
-                    } else {
-                        panic!("⚠️  No BSC signature found for owner {:?}", owner);
-                    }
+            for (owner, nodes) in node_set.sets.iter() {                    
+                if let Some(expected_signature) = BSC_SIGNATURES_ONE.get(owner) {
+                    assert_eq!(
+                        nodes.signature(), 
+                        *expected_signature, 
+                        "Signature for owner {:?} should match BSC implementation", 
+                        owner
+                    );
+                } else {
+                    panic!("⚠️  No BSC signature found for owner {:?}", owner);
                 }
             }
             println!("✅ NodeSet signature assertion passed: matches BSC implementation");
 
             // Call flush and print hash
-            if let Some(nodes) = node_set {
-                let difflayer = nodes.to_difflayer();
-                let flush_result = triedb.flush(0, B256::ZERO, &Some(difflayer));
-                match flush_result {
-                    Ok(()) => println!("flush executed successfully"),
-                    Err(e) => println!("flush failed: {:?}", e),
-                }
+            let diff_nodes = (*node_set.to_diff_nodes()).clone();
+            let difflayer = Arc::new(DiffLayer::new(diff_nodes, diff_storage_roots.clone()));
+            let flush_result = triedb.flush(0, B256::ZERO, &Some(difflayer));
+            match flush_result {
+                Ok(()) => println!("flush executed successfully"),
+                Err(e) => println!("flush failed: {:?}", e),
             }
         }
         Err(e) => {
             println!("update_all_one failed: {:?}", e);
         }
     }
-
-    result
+    let (root_hash, node_set, _) = result.unwrap();
+    Ok((root_hash, Some(node_set)))
 }
 
 /// Test modification operations based on update_all results
@@ -189,12 +184,19 @@ fn test_update_all_modifications(root_hash: B256, difflayer: Option<Arc<MergedNo
     println!("Preparing to delete {} accounts", 10);
     println!("Preparing to update {} storage states", storage_states.len());
     
-    let difflayer = difflayer.as_ref().map(|d| d.to_difflayer());
+    let difflayers = if let Some(d) = difflayer.as_ref() {
+        let diff_nodes = (*d.to_diff_nodes()).clone();
+        let mut difflayers = DiffLayers::default();
+        difflayers.insert_difflayer(Arc::new(DiffLayer::new(diff_nodes, HashMap::new())));
+        Some(difflayers)
+    } else {
+        None
+    };
     // Call update_all interface
-    let result = triedb.update_and_commit(root_hash, difflayer, states, HashSet::new(), storage_states);
+    let result = triedb.batch_update_and_commit(root_hash, difflayers.as_ref(), states, HashSet::new(), storage_states);
     
     match result {
-        Ok((root_hash, node_set)) => {
+        Ok((root_hash, node_set, diff_storage_roots)) => {
             // Assert that the root hash matches the BSC result
             let expected_hash = B256::from_str("0x626ca0a9ca91a1fe5e3a4f438f11015e6e64510b6a29c3a6362d98abad5e4875")
                 .expect("Failed to parse expected hash");
@@ -202,29 +204,28 @@ fn test_update_all_modifications(root_hash: B256, difflayer: Option<Arc<MergedNo
             println!("✅ Root hash assertion passed: matches BSC implementation, root hash: {:?}", root_hash);
             
             // Assert that the NodeSet signatures match BSC implementation and call flush
-            if let Some(node_sets) = node_set {
-                // First, verify signatures
-                for (owner, nodes) in node_sets.sets.iter() {                    
-                    if let Some(expected_signature) = BSC_SIGNATURES_TWO.get(owner) {
-                        assert_eq!(
-                            nodes.signature(), 
-                            *expected_signature, 
-                            "Signature for owner {:?} should match BSC implementation", 
-                            owner
-                        );
-                    } else {
-                        panic!("⚠️  No BSC signature found for owner {:?}", owner);
-                    }
+            // First, verify signatures
+            for (owner, nodes) in node_set.sets.iter() {                    
+                if let Some(expected_signature) = BSC_SIGNATURES_TWO.get(owner) {
+                    assert_eq!(
+                        nodes.signature(), 
+                        *expected_signature, 
+                        "Signature for owner {:?} should match BSC implementation", 
+                        owner
+                    );
+                } else {
+                    panic!("⚠️  No BSC signature found for owner {:?}", owner);
                 }
-                println!("✅ NodeSet signature assertion passed: matches BSC implementation");
-                
-                let difflayer = node_sets.to_difflayer();
-                // Call flush and print hash
-                let flush_result = triedb.flush(0, B256::ZERO, &Some(difflayer));
-                match flush_result {
-                    Ok(()) => println!("Modification flush executed successfully"),
-                    Err(e) => println!("Modification flush failed: {:?}", e),
-                }
+            }
+            println!("✅ NodeSet signature assertion passed: matches BSC implementation");
+            
+            let diff_nodes = (*node_set.to_diff_nodes()).clone();
+            let difflayer = Arc::new(DiffLayer::new(diff_nodes, diff_storage_roots));
+            // Call flush and print hash
+            let flush_result = triedb.flush(0, B256::ZERO, &Some(difflayer));
+            match flush_result {
+                Ok(()) => println!("Modification flush executed successfully"),
+                Err(e) => println!("Modification flush failed: {:?}", e),
             }
         }
         Err(e) => {
@@ -316,4 +317,67 @@ static BSC_SIGNATURES_TWO: Lazy<HashMap<B256, B256>> = Lazy::new(|| {
     );
     map
 });
+
+/// Simple test for TrieDB functionality
+///
+/// This test demonstrates basic TrieDB operations:
+/// 1. Initialize global manager
+/// 2. Create TrieDB instance with PathDB
+/// 3. Update an account
+/// 4. Commit changes
+#[test]
+#[serial]
+fn test_multiple_accounts_update() {
+    // Initialize global manager
+    init_empty_root_node();
+
+    // Create temporary directories for databases
+    let path_db_temp_dir = TempDir::new().expect("Failed to create temp directory for PathDB");
+    let path_db_path = path_db_temp_dir.path().to_str().unwrap();
+
+    // Create path database and TrieDB instance
+    let config = PathProviderConfig::default();
+    let path_db = PathDB::new(path_db_path, config).expect("Failed to create PathDB");
+    let mut triedb = TrieDB::new(path_db);
+
+    let total_operations = 10000;
+
+    let mut states = HashMap::new();
+    let states_rebuild = HashSet::new();
+    let storage_states = HashMap::new();
+
+    for i in 0..total_operations {
+        let hashed_address = keccak256((i as u64).to_le_bytes());
+        let account = StateAccount::default()
+            .with_nonce(i as u64)
+            .with_balance(U256::from(i as u64));
+
+        states.insert(hashed_address, Some(account));
+    }
+    // Update and commit
+    let (root_hash, merged_node_set, diff_storage_roots) = triedb.batch_update_and_commit(
+        B256::ZERO,
+        None,
+        states,
+        states_rebuild,
+        storage_states,
+    ).unwrap();
+
+    let diff_nodes = (*merged_node_set.to_diff_nodes()).clone();
+    let difflayer = Arc::new(DiffLayer::new(diff_nodes, diff_storage_roots));
+    triedb.flush(0, root_hash, &Some(difflayer)).unwrap();
+    
+
+    triedb.state_at(root_hash, None).unwrap();
+
+    for i in 0..total_operations {
+        let hashed_address = keccak256((i as u64).to_le_bytes());
+        triedb.get_account_with_hash_state(hashed_address).unwrap().unwrap();
+    }
+    triedb.clean();
+
+    println!("Result: {:?}", root_hash);
+
+    
+}
 
