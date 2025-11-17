@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use alloy_primitives::B256;
 use alloy_trie::EMPTY_ROOT_HASH;
+
 use rust_eth_triedb_common::TrieDatabase;
 use rust_eth_triedb_state_trie::node::DiffLayers;
 use rust_eth_triedb_state_trie::state_trie::StateTrie;
@@ -28,19 +29,142 @@ pub enum TrieDBError {
     StateTrie(#[from] rust_eth_triedb_state_trie::secure_trie::SecureTrieError),
 }
 
-/// Trie database implementation
+/// Ethereum-compatible trie database implementation for managing state and storage tries.
+///
+/// `TrieDB` is the main structure for managing Ethereum state data, including the
+/// account trie (state trie) and individual storage tries for each account. It
+/// provides a unified interface for reading and writing account and storage data
+/// while maintaining consistency across multiple tries.
+///
+/// This structure is fully compatible with Ethereum's state management model and
+/// can be used with Ethereum-compatible blockchain networks, including BSC and
+/// other EVM-compatible chains.
+///
+/// # Architecture
+///
+/// The `TrieDB` maintains:
+/// - One account trie (state trie) that stores all account data
+/// - Multiple storage tries, one per account that has storage
+/// - Caching mechanisms to optimize access to frequently used tries
+/// - Diff layers for tracking uncommitted state changes
+///
+/// # Type Parameters
+///
+/// * `DB` - The database type that implements `TrieDatabase`. This provides the
+///   storage backend for persisting and retrieving trie nodes.
+///
+/// # ⚠️ Important: Initialization Required
+///
+/// **Before using `TrieDB` for any operations, you MUST call [`state_at`](Self::state_at)**
+/// to reset the `TrieDB` state and build the `account_trie`.
+///
+/// The `account_trie` field is `Option<StateTrie<DB>>` and starts as `None` when
+/// `TrieDB` is created. Without calling `state_at`, all operations that depend on
+/// the account trie will panic (e.g., `get_account`, `get_storage`, etc.).
+///
+/// ## Usage Pattern
+///
+/// ```ignore
+/// // 1. Create a new TrieDB instance
+/// let mut triedb = TrieDB::new(path_db);
+///
+/// // 2. ⚠️ REQUIRED: Initialize with a root hash and optional diff layer
+/// triedb.state_at(root_hash, difflayer)?;
+///
+/// // 3. Now you can safely use query or batch operations
+/// let account = triedb.get_account(address)?;
+/// triedb.batch_update_and_commit(...)?;
+/// ```
+///
+/// The `state_at` method:
+/// - Resets the `TrieDB` to the specified state root hash
+/// - Builds and initializes the `account_trie` from the root hash
+/// - Clears all cached storage tries and account data
+/// - Sets up the diff layer for tracking changes
+/// - Must be called before any read or write operations
 pub struct TrieDB<DB> 
 where
     DB: TrieDatabase + Clone + Send + Sync,
     DB::Error: std::fmt::Debug,
 {
+    /// The root hash of the current account trie (state trie).
+    ///
+    /// This represents the root hash of the entire Ethereum state at a specific
+    /// point in time. Any change to any account or storage will result in a
+    /// different root hash.
     pub(crate) root_hash: B256,
+    
+    /// The account trie (state trie) instance.
+    ///
+    /// This is the main trie that stores all Ethereum accounts. Each account's
+    /// data (nonce, balance, storage root, code hash) is stored in this trie,
+    /// keyed by the Keccak-256 hash of the account address.
+    ///
+    /// This field is `Option` because the trie may not be initialized until
+    /// `state_at` is called with a specific root hash.
     pub(crate) account_trie: Option<StateTrie<DB>>,
+    
+    /// A cache of storage trie instances, keyed by account address hash.
+    ///
+    /// This map stores `StateTrie` instances for accounts that have been accessed
+    /// or modified. The key is the Keccak-256 hash of the account address (`B256`),
+    /// and the value is the `StateTrie` instance for that account's storage.
+    ///
+    /// **Purpose**: This cache allows efficient access to storage tries without
+    /// recreating them on every access. When a storage trie is first accessed,
+    /// it is created and stored here for subsequent operations.
+    ///
+    /// **Difference from `accounts_with_storage_trie`**: This field stores the
+    /// actual trie objects (`StateTrie`) that can be used to read/write storage
+    /// data, while `accounts_with_storage_trie` stores only the account metadata
+    /// (`StateAccount`) for tracking purposes.
     pub(crate) storage_tries: HashMap<B256, StateTrie<DB>>,
+    
+    /// A cache of account data for accounts that have storage tries.
+    ///
+    /// This map stores `StateAccount` instances for accounts whose storage has
+    /// been accessed or modified. The key is the Keccak-256 hash of the account
+    /// address (`B256`), and the value is the complete account data.
+    ///
+    /// **Purpose**: This cache tracks which accounts have storage operations and
+    /// maintains their account state (including the storage root) for efficient
+    /// updates during commit operations.
+    ///
+    /// **Difference from `storage_tries`**: This field stores account metadata
+    /// (`StateAccount`) including nonce, balance, storage root, and code hash,
+    /// while `storage_tries` stores the actual trie objects (`StateTrie`) used
+    /// for storage operations. When committing changes, this field helps track
+    /// which accounts need their storage roots updated.
+    ///
+    /// **Usage**: This is primarily used during batch updates to track accounts
+    /// that have storage modifications, ensuring their storage roots are correctly
+    /// updated in the account trie when committing.
     pub(crate) accounts_with_storage_trie: HashMap<B256, StateAccount>,
+    
+    /// A map tracking updated storage root hashes for accounts.
+    ///
+    /// This map stores the new storage root hashes for accounts whose storage
+    /// has been modified. The key is the Keccak-256 hash of the account address,
+    /// and the value is the new storage root hash.
+    ///
+    /// **Purpose**: When storage is modified, the storage trie's root hash changes.
+    /// This map tracks these changes so that the account's `storage_root` field
+    /// can be updated in the account trie during commit operations.
     pub(crate) updated_storage_roots: HashMap<B256, B256>,
+    
+    /// Uncommitted diff layers for tracking state changes.
+    ///
+    /// This contains a collection of `DiffLayer` instances, one per uncommitted
+    /// block, that track all trie node and storage root modifications before they
+    /// are persisted to the database.
     pub(crate) difflayer: Option<DiffLayers>,
-    pub path_db: DB,
+    
+    /// The underlying database instance for storing and retrieving trie nodes.
+    ///
+    /// This database provides the persistent storage backend for all trie operations.
+    pub(crate) path_db: DB,
+    
+    /// Metrics for monitoring trie database operations and performance.
     pub(crate) metrics: TrieDBMetrics,
 }
 
@@ -126,6 +250,7 @@ where
             .field("account_trie", &format!("<StateTrie<{}>>", std::any::type_name::<DB>()))
             .field("storage_tries_count", &self.storage_tries.len())
             .field("accounts_with_storage_trie_count", &self.accounts_with_storage_trie.len())
+            .field("updated_storage_roots_count", &self.updated_storage_roots.len())
             .field("difflayer", &self.difflayer.as_ref().map(|_| "<Difflayer>"))
             .field("db", &format!("<{}>", std::any::type_name::<DB>()))
             .finish()

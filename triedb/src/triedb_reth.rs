@@ -17,9 +17,56 @@ use rust_eth_triedb_state_trie::{SecureTrieId, SecureTrieTrait, SecureTrieBuilde
 
 use crate::triedb::{TrieDB, TrieDBError};
 
-/// Compatible with the clients using hashed keys to access triedb
-/// Storage update and delete functions are not ready in the current implementation
-/// Get functions can used to prewarm the trie db
+/// Reth-compatible interface functions using hashed keys for TrieDB.
+///
+/// This module provides interfaces compatible with clients that use hashed keys
+/// (Keccak-256 hashes of addresses and storage keys) to access the trie database.
+///
+/// # Write Operations (Batch Only)
+///
+/// **Important**: `TrieDB` only supports batch write operations. Individual storage 
+/// key-value write operations are **not supported** and will not persist correctly.
+///
+/// All write operations must be performed through one of the following batch methods:
+/// - [`batch_update_and_commit`](Self::batch_update_and_commit) - 
+///   Batch update accounts and storage, then commit all changes atomically
+/// - [`commit_hashed_post_state`](Self::commit_hashed_post_state) - 
+///   Commit a complete post-state with all account and storage changes
+///
+/// The modification functions (`update_account_with_hash_state`, `delete_account_with_hash_state`, 
+/// `update_storage_with_hash_state`, `delete_storage_with_hash_state`) in this module are 
+/// **not intended for external use**. They are:
+/// - Marked as `#[allow(dead_code)]` or kept internal for internal batch operations
+/// - Only modify in-memory state without proper commit handling
+/// - Do not update storage roots correctly in the account trie
+/// - Do not integrate with the diff layer system
+/// - Individual writes would be inefficient and break consistency guarantees
+///
+/// # Read Operations (Public API)
+///
+/// The query functions (`get_account_with_hash_state`, `get_storage_with_hash_state`) are 
+/// **public and safe to use**. They support:
+/// - Reading account data from the state trie using hashed addresses
+/// - Reading storage values from account storage tries using hashed keys
+/// - **Pre-warming**: These functions can be used to preload and cache frequently
+///   accessed tries into memory, improving subsequent batch operation performance.
+///   When you call `get_account_with_hash_state` or `get_storage_with_hash_state`, the 
+///   underlying tries are loaded and cached, which helps optimize batch operations that 
+///   access the same data.
+///
+/// # Usage Pattern
+///
+/// ```ignore
+/// // ✅ Correct: Use batch operations for writes
+/// triedb.batch_update_and_commit(root_hash, difflayer, accounts, rebuild_set, storage)?;
+///
+/// // ✅ Correct: Use query functions for reads and pre-warming
+/// let account = triedb.get_account_with_hash_state(hashed_address)?;
+/// let storage_value = triedb.get_storage_with_hash_state(hashed_address, hashed_key)?;
+///
+/// // ❌ Incorrect: Do not use individual write functions
+/// // triedb.update_storage_with_hash_state(hashed_address, hashed_key, value)?;  // Will not persist correctly!
+/// ```
 impl<DB> TrieDB<DB>
 where
     DB: TrieDatabase + Clone + Send + Sync,
@@ -119,7 +166,7 @@ where
 
         self.metrics.record_hashed_post_state_transform_duration(hashed_post_state_transform_start.elapsed().as_secs_f64());
 
-        let (root_hash, node_set, diff_storage_roots) = self.update_and_commit(
+        let (root_hash, node_set, diff_storage_roots) = self.batch_update_and_commit(
             root_hash, 
             difflayer, 
             states, 
@@ -133,8 +180,7 @@ where
             return Ok((root_hash, None));
         }
         
-        return Ok((root_hash, Some(difflayer)));
-        
+        Ok((root_hash, Some(difflayer)))      
     }
 
     /// Batch update the changes and commit
@@ -145,7 +191,7 @@ where
     /// 3. Prepare required data to avoid borrowing conflicts for parallel execution
     /// 4. Parallel execution: update accounts and storage simultaneously
     /// 5. Commit the changes
-    pub fn update_and_commit(
+    pub fn batch_update_and_commit(
         &mut self, 
         root_hash: B256, 
         difflayer: Option<&DiffLayers>, 

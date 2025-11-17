@@ -98,9 +98,9 @@ fn test_update_all_initial(triedb: &mut TrieDB<PathDB>) -> Result<(B256, Option<
     println!("Constructed {} storage states", storage_states.len());
     
     // Call update_all interface
-    let result = triedb.update_and_commit(EMPTY_ROOT_HASH, None, states, HashSet::new(), storage_states);
+    let result = triedb.batch_update_and_commit(EMPTY_ROOT_HASH, None, states, HashSet::new(), storage_states);
     match &result {
-        Ok((root_hash, node_set, diff_storage_roots)) => {            
+        Ok((root_hash, node_set, diff_storage_roots)) => {    
             // Assert that root_hash matches BSC implementation result
             let expected_hash = B256::from_str("0xadcc848b76bace28ea81dd449a735bad44663a36f18f40980d586d5315eb3800")
                 .expect("Failed to parse expected hash");
@@ -193,7 +193,7 @@ fn test_update_all_modifications(root_hash: B256, difflayer: Option<Arc<MergedNo
         None
     };
     // Call update_all interface
-    let result = triedb.update_and_commit(root_hash, difflayers.as_ref(), states, HashSet::new(), storage_states);
+    let result = triedb.batch_update_and_commit(root_hash, difflayers.as_ref(), states, HashSet::new(), storage_states);
     
     match result {
         Ok((root_hash, node_set, diff_storage_roots)) => {
@@ -227,7 +227,6 @@ fn test_update_all_modifications(root_hash: B256, difflayer: Option<Arc<MergedNo
                 Ok(()) => println!("Modification flush executed successfully"),
                 Err(e) => println!("Modification flush failed: {:?}", e),
             }
-            
         }
         Err(e) => {
             println!("Modification update_all failed: {:?}", e);
@@ -356,7 +355,7 @@ fn test_multiple_accounts_update() {
         states.insert(hashed_address, Some(account));
     }
     // Update and commit
-    let (root_hash, merged_node_set, diff_storage_roots) = triedb.update_and_commit(
+    let (root_hash, merged_node_set, diff_storage_roots) = triedb.batch_update_and_commit(
         B256::ZERO,
         None,
         states,

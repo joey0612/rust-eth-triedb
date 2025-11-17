@@ -15,9 +15,43 @@ use rust_eth_triedb_state_trie::{SecureTrieId, SecureTrieTrait, SecureTrieBuilde
 
 use crate::triedb::{TrieDB, TrieDBError};
 
-/// Geth interface functions
-/// Storage update and delete functions are not ready in the current implementation
-/// Get functions can used to prewarm the trie db
+/// Geth-compatible interface functions for TrieDB.
+///
+/// # Write Operations (Batch Only)
+///
+/// **Important**: `TrieDB` only supports batch write operations. Individual storage 
+/// key-value write operations are **not supported** and will not persist correctly.
+///
+/// All write operations must be performed through one of the following batch methods:
+/// - [`batch_update_and_commit`](crate::triedb_reth::TrieDB::batch_update_and_commit) - 
+///   Batch update accounts and storage, then commit all changes atomically
+/// - [`commit_hashed_post_state`](crate::triedb_reth::TrieDB::commit_hashed_post_state) - 
+///   Commit a complete post-state with all account and storage changes
+///
+/// # Read Operations (Public API)
+///
+/// The query functions (`get_account`, `get_storage`) are **public and safe to use**.
+/// They support:
+/// - Reading account data from the state trie
+/// - Reading storage values from account storage tries
+/// - **Pre-warming**: These functions can be used to preload and cache frequently
+///   accessed tries into memory, improving subsequent batch operation performance.
+///   When you call `get_account` or `get_storage`, the underlying tries are loaded
+///   and cached, which helps optimize batch operations that access the same data.
+///
+/// # Usage Pattern
+///
+/// ```ignore
+/// // ✅ Correct: Use batch operations for writes
+/// triedb.batch_update_and_commit(root_hash, difflayer, accounts, rebuild_set, storage)?;
+///
+/// // ✅ Correct: Use query functions for reads and pre-warming
+/// let account = triedb.get_account(address)?;
+/// let storage_value = triedb.get_storage(address, key)?;
+///
+/// // ❌ Incorrect: Do not use individual write functions
+/// // triedb.update_storage(address, key, value)?;  // Will not correct!
+/// ```
 impl<DB> TrieDB<DB>
 where
     DB: TrieDatabase + Clone + Send + Sync,
@@ -82,10 +116,8 @@ where
         for (hashed_address, storage_hash) in storage_hashes {   
             let mut account = self.accounts_with_storage_trie.get(&hashed_address).unwrap().clone();
             account.storage_root = storage_hash;
-            // self.storage_root_cache.write().unwrap().insert(hashed_address.as_slice().to_vec(), Some(storage_hash.as_slice().to_vec()));
             self.update_account_with_hash_state(hashed_address, &account)?;
         }
-        // self.storage_tries = storage_tries;
         self.storage_tries.extend(storage_tries);
 
         self.metrics.record_hash_duration(hash_start.elapsed().as_secs_f64());

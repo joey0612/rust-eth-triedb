@@ -31,6 +31,39 @@ static MANAGER_INSTANCE: OnceLock<TrieDBManager> = OnceLock::new();
 /// 
 /// # Arguments
 /// * `path` - Path to the database directory
+/// 
+/// # ⚠️ Important: Single Initialization Pattern
+/// 
+/// **Only the first call to `init_global_manager` is effective.** The path provided in the
+/// first call determines the database path for the entire lifetime of the application.
+/// 
+/// All subsequent calls to `init_global_manager` will **ignore the path parameter** and
+/// return the same database instance that was created with the first path.
+/// 
+/// ## Recommended Usage Pattern
+/// 
+/// ```ignore
+/// // ✅ Correct: Call once at application startup
+/// fn main() {
+///     // Initialize once at startup with the desired database path
+///     init_global_manager("/path/to/database");
+///     
+///     // Later in your code, just get the instance
+///     let triedb = get_global_triedb();
+///     // ... use triedb
+/// }
+/// 
+/// // ❌ Incorrect: Multiple initialization attempts
+/// fn main() {
+///     init_global_manager("/path/to/db1");  // This path is used
+///     init_global_manager("/path/to/db2");  // This path is IGNORED!
+///     // The database will still use "/path/to/db1"
+/// }
+/// ```
+/// 
+/// **Best Practice**: Call `init_global_manager` exactly once during application
+/// initialization (e.g., in `main()` or startup code), then use `get_global_triedb()`
+/// throughout the rest of your application to access the singleton instance.
 pub fn init_global_manager(path: &str) {
     init_empty_root_node();
     MANAGER_INSTANCE.get_or_init(|| {
