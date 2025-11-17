@@ -739,7 +739,10 @@ where
             return Ok(Node::must_decode_node(Some(*hash), &node_blob));
         }
 
-        return Err(SecureTrieError::Database(format!("Node not found in database: owner: {:?}, prefix: {:?}, key: {:?}", self.owner, prefix, key)));
+        let owner_hex = format!("0x{:x}", self.owner);
+        let prefix_hex = prefix.iter().map(|b| format!("{:02x}", b)).collect::<String>();
+        let key_hex = key.iter().map(|b| format!("{:02x}", b)).collect::<String>();
+        return Err(SecureTrieError::Database(format!("missing trie node: owner: {}, prefix: 0x{}, key: 0x{}", owner_hex, prefix_hex, key_hex)));
     }
 
 }

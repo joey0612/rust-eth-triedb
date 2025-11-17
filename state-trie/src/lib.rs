@@ -31,12 +31,10 @@ pub mod trie_committer;
 #[cfg(test)]
 mod trie_test;
 
-// Re-export main types and traits
-// pub use crate::trie::Trie;
-pub use secure_trie::{SecureTrieId, SecureTrieBuilder, SecureTrieError};
 // pub use state_trie::{StateTrie, SecureTrie};
 pub use account::StateAccount;
 pub use traits::SecureTrieTrait;
 pub use node::NodeSet;
 // Re-export TrieNode, DiffLayer, DiffLayers from common crate
+pub use secure_trie::{SecureTrieId, SecureTrieBuilder, SecureTrieError};
 pub use rust_eth_triedb_common::{TrieNode, DiffLayer, DiffLayers};

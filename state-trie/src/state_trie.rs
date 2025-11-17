@@ -13,10 +13,59 @@ use super::trie::Trie;
 use super::node::{NodeSet, DiffLayers};
 use super::node::rlp_raw;
 
-/// State trie implementation that wraps a trie with secure key hashing
+/// Ethereum-compatible state trie implementation with secure key hashing.
+///
+/// `StateTrie` is a high-level wrapper around the underlying `Trie` structure that
+/// provides secure key hashing functionality. It implements the Ethereum state trie
+/// specification, where all keys (addresses and storage keys) are hashed using
+/// Keccak-256 before being stored in the trie.
+///
+/// This structure is fully compatible with Ethereum's state trie implementation
+/// and can be used to manage state for Ethereum-compatible blockchain networks,
+/// including BSC and other EVM-compatible chains.
+///
+/// # Key Features
+///
+/// - **Secure Key Hashing**: All keys are automatically hashed using Keccak-256
+///   before being used in trie operations, ensuring uniform key distribution and
+///   security.
+/// - **Account Management**: Provides methods to get, update, and delete Ethereum
+///   accounts from the state trie.
+/// - **Storage Management**: Supports reading and writing storage values for accounts,
+///   with automatic key hashing.
+/// - **State Tracking**: Maintains a unique identifier (`SecureTrieId`) that tracks
+///   the state root and owner of the trie.
+///
+/// # Architecture
+///
+/// `StateTrie` wraps a `Trie<DB>` instance and adds a `SecureTrieId` for identification.
+/// The underlying trie handles the actual Merkle Patricia Trie operations, while
+/// `StateTrie` provides the Ethereum-specific interface and key hashing.
+///
+/// # Thread Safety
+///
+/// This structure is `Clone`, allowing it to be shared across threads. However,
+/// mutable operations are not thread-safe and should be protected by appropriate
+/// synchronization primitives if used in concurrent contexts.
+///
+/// # Type Parameters
+///
+/// * `DB` - The database type that implements `TrieDatabase`. This provides the
+///   storage backend for persisting and retrieving trie nodes.
 #[derive(Clone)]
 pub struct StateTrie<DB> {
+    /// The underlying trie structure that handles Merkle Patricia Trie operations.
+    ///
+    /// This trie stores all the actual node data and performs the core trie
+    /// operations (get, update, delete, commit, etc.). The `StateTrie` wrapper
+    /// adds key hashing and Ethereum-specific semantics on top of this base trie.
     trie: Trie<DB>,
+    
+    /// The unique identifier for this state trie instance.
+    ///
+    /// This identifier combines the state root hash and an optional owner address,
+    /// allowing the system to distinguish between different trie instances and
+    /// track the current state of the trie.
     id: SecureTrieId,
 }
 

@@ -35,12 +35,52 @@ pub enum SecureTrieError {
     InvalidStorage,
 }
 
-/// Secure trie identifier
+/// A unique identifier for a secure trie instance.
+///
+/// `SecureTrieId` uniquely identifies a specific state trie by combining the
+/// state root hash with an optional owner address. This structure is used
+/// to distinguish between different trie instances, particularly when managing
+/// multiple tries (e.g., state trie and storage tries for different accounts).
+///
+/// The identifier is essential for:
+/// - Tracking the root state of a trie at a specific point in time
+/// - Distinguishing between different trie instances in a multi-trie system
+/// - Supporting secure trie operations where each trie has a unique identity
+///
+/// # Field Descriptions
+///
+/// - `state_root`: The root hash of the trie's state. This uniquely identifies
+///   the complete state of the trie at a given point. For an empty trie, this
+///   is set to `EMPTY_ROOT_HASH`.
+/// - `owner`: An optional owner address that can be used to associate the trie
+///   with a specific account or entity. For the main state trie, this is typically
+///   `B256::ZERO`. For storage tries, this would be the account address hash.
+///
+/// # Usage
+///
+/// This identifier is used when creating or accessing a `StateTrie` instance,
+/// allowing the system to correctly identify and load the appropriate trie state
+/// from the database.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SecureTrieId {
-    /// State root hash
+    /// The root hash of the trie's state.
+    ///
+    /// This `B256` value uniquely identifies the complete state of the trie.
+    /// Any change to the trie's contents will result in a different state root,
+    /// making it an ideal identifier for versioning and state tracking.
+    ///
+    /// For an empty trie, this should be set to `EMPTY_ROOT_HASH`.
     pub state_root: B256,
-    /// Owner address
+    
+    /// The owner address associated with this trie.
+    ///
+    /// This field can be used to associate the trie with a specific account or
+    /// entity. For the main Ethereum state trie, this is typically `B256::ZERO`.
+    /// For account storage tries, this would be the Keccak-256 hash of the
+    /// account address.
+    ///
+    /// The owner field enables the system to distinguish between multiple tries
+    /// that might share the same state root but belong to different contexts.
     pub owner: B256,
 }
 

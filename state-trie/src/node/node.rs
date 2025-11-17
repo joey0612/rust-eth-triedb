@@ -70,7 +70,7 @@ pub fn get_empty_root_node() -> &'static Arc<Node> {
         .expect("Empty root node not initialized. Call init_empty_root_node() first.")
 }
 
-/// Node types in the BSC-style trie
+/// Node types in the ETH-style trie
 #[derive(Debug, Clone, PartialEq)]
 pub enum Node {
     /// Empty root node
@@ -116,7 +116,8 @@ impl Node {
     /// Must decode node - panics on error
     pub fn must_decode_node(hash: Option<B256>, buf: &[u8]) -> Arc<Node> {
         Node::decode_node(hash, buf).unwrap_or_else(|e| {
-            panic!("Failed to decode node: {:?}", e);
+            let hash_hex = hash.map(|h| format!("0x{:x}", h)).unwrap_or_else(|| "None".to_string());
+            panic!("Failed to decode trie node: {:?}, hash: {}", e, hash_hex);
         })
     }
 

@@ -1,20 +1,67 @@
 //! State account structure and implementation.
 
 use alloy_primitives::{B256, U256, keccak256};
-#[allow(unused_imports)]
-use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
+use alloy_rlp::{Decodable, RlpDecodable, RlpEncodable};
 
 
-/// State account structure
+/// Ethereum-compatible state account structure.
+///
+/// This structure represents an account in the Ethereum state trie, following
+/// the standard Ethereum account format. It is fully compatible with Ethereum's
+/// account encoding and can be used interchangeably with Ethereum-compatible
+/// blockchain networks (including BSC, which is EVM-compatible).
+///
+/// The account data is stored in the state trie and encoded using RLP (Recursive
+/// Length Prefix) encoding, which is the standard serialization format used by
+/// Ethereum and EVM-compatible chains.
+///
+/// # Field Descriptions
+///
+/// - `nonce`: The number of transactions sent from this account (for EOA) or
+///   the number of contract creations made by this account (for contract accounts).
+/// - `balance`: The account's balance in wei (the smallest unit of Ether).
+/// - `storage_root`: The root hash of the account's storage trie. For accounts
+///   with no storage, this is `EMPTY_ROOT_HASH`.
+/// - `code_hash`: The Keccak-256 hash of the account's contract code. For
+///   externally owned accounts (EOA), this is `KECCAK_EMPTY`.
+///
+/// # RLP Encoding
+///
+/// The account is encoded as an RLP list containing four elements in order:
+/// `[nonce, balance, storage_root, code_hash]`. This encoding format is identical
+/// to Ethereum's account encoding, ensuring full compatibility.
+///
+/// # Compatibility
+///
+/// This structure is fully compatible with:
+/// - Ethereum mainnet and testnets
+/// - BSC (Binance Smart Chain) and other EVM-compatible chains
+/// - Any blockchain that follows Ethereum's account model
 #[derive(Copy, Clone, Debug, PartialEq, Eq, RlpDecodable, RlpEncodable)]
 pub struct StateAccount {
-    /// Account nonce
+    /// Account nonce - the number of transactions sent from this account.
+    ///
+    /// For externally owned accounts (EOA), this represents the transaction count.
+    /// For contract accounts, this represents the number of contract creations.
     pub nonce: u64,
-    /// Account balance
+    
+    /// Account balance in wei (the smallest unit of Ether).
+    ///
+    /// This is stored as a `U256` to support the full range of possible balances
+    /// without overflow.
     pub balance: U256,
-    /// Storage trie root hash
+    
+    /// Storage trie root hash for this account's storage.
+    ///
+    /// Each account has its own storage trie, and this field stores the root hash
+    /// of that trie. For accounts with no storage (empty storage), this should be
+    /// set to `EMPTY_ROOT_HASH`.
     pub storage_root: B256,
-    /// Code hash
+    
+    /// Keccak-256 hash of the account's contract code.
+    ///
+    /// For externally owned accounts (EOA), this is `KECCAK_EMPTY` (hash of empty code).
+    /// For contract accounts, this is the Keccak-256 hash of the deployed bytecode.
     pub code_hash: B256,
 }
 
@@ -71,6 +118,7 @@ impl StateAccount {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_rlp::Encodable;
 
     #[test]
     fn test_state_account_empty() {
