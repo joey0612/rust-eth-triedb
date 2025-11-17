@@ -15,7 +15,7 @@ rust-eth-triedb-state-trie.workspace = true
 rust-eth-triedb-pathdb.workspace = true
 rust-eth-triedb-common.workspace = true
 alloy-rlp.workspace = true
-alloy-primitives.workspace = true
+alloy-primitives = { workspace = true , asm-keccak = true}
 alloy-trie.workspace = true
 rand.workspace = true
 thiserror.workspace = true
@@ -30,6 +30,7 @@ tempfile.workspace = true
 
 [features]
 jemalloc = ["tikv-jemallocator"]
+asm-keccak = ["alloy-primitives/asm-keccak", "rust-eth-triedb-common/asm-keccak", "rust-eth-triedb-state-trie/asm-keccak", "rust-eth-triedb-pathdb/asm-keccak"]
 
 [profile.maxperf]
 inherits = "release"

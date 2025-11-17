@@ -15,10 +15,11 @@ workspace = true
 default = []
 jemalloc = ["tikv-jemallocator"]
 jemalloc-prof = ["tikv-jemallocator?/profiling"]
+asm-keccak = ["alloy-primitives/asm-keccak"]
 
 [dependencies]
 # alloy
-alloy-primitives = { workspace = true, features = ["asm-keccak"] }
+alloy-primitives = { workspace = true , asm-keccak = true}
 
 # misc
 auto_impl.workspace = true

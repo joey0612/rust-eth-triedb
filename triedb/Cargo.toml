@@ -8,11 +8,6 @@ homepage.workspace = true
 repository.workspace = true
 description = "Trie database implementation for Ethereum state management"
 
-[features]
-default = []
-jemalloc = ["tikv-jemallocator"]
-jemalloc-prof = ["tikv-jemallocator?/profiling"]
-
 [dependencies]
 # Local dependencies
 rust-eth-triedb-state-trie.workspace = true
@@ -33,7 +28,7 @@ schnellru.workspace = true
 metrics.workspace = true
 
 # External dependencies
-alloy-primitives = { workspace = true, features = ["asm-keccak"] }
+alloy-primitives = { workspace = true , asm-keccak = true}
 thiserror.workspace = true
 serde = { version = "1.0", features = ["derive"] }
 rayon.workspace = true
@@ -42,6 +37,12 @@ tracing.workspace = true
 
 # Jemalloc support
 tikv-jemallocator = { workspace = true, optional = true }
+
+[features]
+default = []
+jemalloc = ["tikv-jemallocator"]
+jemalloc-prof = ["tikv-jemallocator?/profiling"]
+asm-keccak = ["alloy-primitives/asm-keccak", "rust-eth-triedb-common/asm-keccak", "rust-eth-triedb-state-trie/asm-keccak", "rust-eth-triedb-pathdb/asm-keccak"]
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["full"] }

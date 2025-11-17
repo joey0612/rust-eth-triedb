@@ -18,7 +18,7 @@ rust-eth-triedb-pathdb.workspace = true
 rust-eth-triedb-common.workspace = true
 
 # alloy
-alloy-primitives = { workspace = true, features = ["asm-keccak"] }
+alloy-primitives = { workspace = true , asm-keccak = true}
 alloy-rlp.workspace = true
 alloy-trie.workspace = true
 
@@ -39,6 +39,7 @@ tracing.workspace = true
 arbitrary = ["dep:arbitrary"]
 jemalloc = ["tikv-jemallocator"]
 jemalloc-prof = ["tikv-jemallocator?/profiling"]
+asm-keccak = ["alloy-primitives/asm-keccak"]
 
 [dev-dependencies]
 # reth

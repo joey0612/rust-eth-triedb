@@ -49,7 +49,14 @@ metrics-derive = "0.1"
 
 [workspace.features]
 jemalloc = ["tikv-jemallocator"]
-jemalloc-prof = ["tikv-jemallocator?/profiling"] 
+jemalloc-prof = ["tikv-jemallocator?/profiling"]
+asm-keccak = [
+    "rust-eth-triedb-common/asm-keccak",
+    "rust-eth-triedb-pathdb/asm-keccak",
+    "rust-eth-triedb-state-trie/asm-keccak",
+    "rust-eth-triedb/asm-keccak",
+    "rust-eth-triedb-smoke-test/asm-keccak",
+] 
 
 [profile.release]
 opt-level = 3

@@ -1,0 +1,61 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+
+jobs:
+  test:
+    name: Run unit tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Test common
+        run: |
+          cd common
+          cargo test
+
+      - name: Test db/pathdb
+        run: |
+          cd db/pathdb
+          cargo test
+
+      - name: Test state-trie
+        run: |
+          cd state-trie
+          cargo test
+
+      - name: Test smoke-test (specific tests only)
+        run: |
+          cd smoke-test
+          cargo test test_storage_trie_smoke_test -- --nocapture
+          cargo test test_state_trie_smoke_test -- --nocapture
+
+      - name: Test triedb
+        run: |
+          cd triedb
+          cargo test
+
