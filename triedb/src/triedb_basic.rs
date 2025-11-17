@@ -120,8 +120,9 @@ where
         }
         self.storage_tries.extend(storage_tries);
 
+        let hash = self.account_trie.as_mut().unwrap().hash();
         self.metrics.record_hash_duration(hash_start.elapsed().as_secs_f64());
-        Ok(self.account_trie.as_mut().unwrap().hash())
+        Ok(hash)
     }
 
     pub fn commit(&mut self, _collect_leaf: bool) -> Result<(B256, Arc<MergedNodeSet>), TrieDBError> {

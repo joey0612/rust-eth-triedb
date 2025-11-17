@@ -18,17 +18,20 @@ where
     pub fn get_storage_root(&mut self, hased_address: B256) -> Result<Option<B256>, TrieDBError> {
         if let Some(dl) = self.difflayer.as_ref() {
             if let Some(root) = dl.get_storage_root(hased_address) {
+                self.metrics.increment_get_storage_root_from_flat_counter();
                 return Ok(Some(root));
             }
         }
 
         if let Some(root) = self.path_db.get_storage_root(hased_address)
             .map_err(|e| TrieDBError::Database(format!("Failed to get storage root: {:?}", e)))? {
+            self.metrics.increment_get_storage_root_from_flat_counter();
             return Ok(Some(root));
         }
 
         if let Some(account) = self.get_account_with_hash_state(hased_address)? {
             self.updated_storage_roots.insert(hased_address, account.storage_root);
+            self.metrics.increment_get_storage_root_from_trie_counter();
             return Ok(Some(account.storage_root));
         }
 

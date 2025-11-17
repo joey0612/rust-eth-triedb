@@ -1,7 +1,7 @@
 //! Metrics for TrieDB operations.
 
 use reth_metrics::{
-    metrics::{Histogram},
+    metrics::{Histogram, Counter},
     Metrics,
 };
 
@@ -22,6 +22,11 @@ pub(crate) struct TrieDBMetrics {
     pub(crate) commit_histogram: Histogram,
     /// Histogram of flush durations (in seconds)
     pub(crate) flush_histogram: Histogram,
+
+    /// Counter of get storage root from flat database
+    pub(crate) get_storage_root_from_flat_counter: Counter,
+    /// Counter of get storage root from trie database
+    pub(crate) get_storage_root_from_trie_counter: Counter,
 }
 
 impl TrieDBMetrics {
@@ -47,6 +52,14 @@ impl TrieDBMetrics {
 
     pub(crate) fn record_update_duration(&self, duration: f64) {
         self.update_histogram.record(duration);
+    }
+
+    pub(crate) fn increment_get_storage_root_from_flat_counter(&self) {
+        self.get_storage_root_from_flat_counter.increment(1);
+    }
+
+    pub(crate) fn increment_get_storage_root_from_trie_counter(&self) {
+        self.get_storage_root_from_trie_counter.increment(1);
     }
 }
 
