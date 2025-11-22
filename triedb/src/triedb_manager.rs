@@ -9,6 +9,24 @@ use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
 use super::TrieDB;
 use rust_eth_triedb_state_trie::node::init_empty_root_node;
 
+// Global singleton for active_triedb flag - can only be initialized once
+static ACTIVE_TRIEDB: OnceLock<bool> = OnceLock::new();
+
+// Enable the active_triedb flag
+pub fn enable_triedb() {
+    ACTIVE_TRIEDB.get_or_init(|| true);
+}
+
+// Disable the active_triedb flag
+pub fn disable_triedb() {
+    ACTIVE_TRIEDB.get_or_init(|| false);
+}
+
+// Check if the active_triedb flag is enabled
+pub fn is_triedb_active() -> bool {
+    ACTIVE_TRIEDB.get().map_or(false, |&b| b)
+}
+
 /// Global TrieDB Manager
 /// 
 /// A singleton manager that maintains a single TrieDB instance
@@ -33,43 +51,20 @@ static MANAGER_INSTANCE: OnceLock<TrieDBManager> = OnceLock::new();
 /// * `path` - Path to the database directory
 /// 
 /// # ⚠️ Important: Single Initialization Pattern
-/// 
-/// **Only the first call to `init_global_manager` is effective.** The path provided in the
-/// first call determines the database path for the entire lifetime of the application.
-/// 
-/// All subsequent calls to `init_global_manager` will **ignore the path parameter** and
-/// return the same database instance that was created with the first path.
-/// 
-/// ## Recommended Usage Pattern
-/// 
-/// ```ignore
-/// // ✅ Correct: Call once at application startup
-/// fn main() {
-///     // Initialize once at startup with the desired database path
-///     init_global_manager("/path/to/database");
-///     
-///     // Later in your code, just get the instance
-///     let triedb = get_global_triedb();
-///     // ... use triedb
-/// }
-/// 
-/// // ❌ Incorrect: Multiple initialization attempts
-/// fn main() {
-///     init_global_manager("/path/to/db1");  // This path is used
-///     init_global_manager("/path/to/db2");  // This path is IGNORED!
-///     // The database will still use "/path/to/db1"
-/// }
-/// ```
-/// 
-/// **Best Practice**: Call `init_global_manager` exactly once during application
-/// initialization (e.g., in `main()` or startup code), then use `get_global_triedb()`
-/// throughout the rest of your application to access the singleton instance.
+/// # Panics
+/// This function will panic if `init_global_manager()` has been called twice.
 pub fn init_global_manager(path: &str) {
+    // Panic if already initialized
+    if MANAGER_INSTANCE.get().is_some() {
+        panic!("TrieDB has already been initialized. It can only be initialized once.");
+    }
+    
     init_empty_root_node();
     MANAGER_INSTANCE.get_or_init(|| {
         let path_str = path.to_string();
         TrieDBManager::new(&path_str)
     });
+    enable_triedb();
 }
 
 // Get the initialized manager instance
