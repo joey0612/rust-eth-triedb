@@ -211,13 +211,11 @@ where
 
         for (hashed_address, new_account) in states {
             if new_account.is_none() {
-                self.updated_storage_roots.insert(hashed_address, alloy_trie::KECCAK_EMPTY);
                 update_accounts.insert(hashed_address, None);
                 continue;
             }
 
             let final_account = if states_rebuild.contains(&hashed_address) {
-                self.updated_storage_roots.insert(hashed_address, alloy_trie::KECCAK_EMPTY);
                 new_account.unwrap()
             }else {
                 if let Some(storage_root) = self.get_storage_root(hashed_address)? {
@@ -243,6 +241,7 @@ where
         // 3. Prepare required data to avoid borrowing conflicts for parallel execution
         let path_db_clone = self.path_db.clone();
         let difflayer_clone = self.difflayer.as_ref().map(|d| d.clone());
+        let mut diff_account_storage_roots = HashMap::new();
 
         // 4. Parallel execution: update accounts and storage simultaneously
         let (account_result, storage_result): (Result<(), TrieDBError>, Result<HashMap<B256, StateTrie<DB>>, TrieDBError>) = rayon::join(
@@ -256,9 +255,11 @@ where
                 // update accounts that are being updated
                 for (hashed_address, account) in update_accounts {
                     if let Some(account) = account {
+                        diff_account_storage_roots.insert(hashed_address, account.storage_root);
                         self.update_account_with_hash_state(hashed_address, &account)
                             .map_err(|e| TrieDBError::Database(format!("Failed to update account for hashed_address {:#x}, error: {}", hashed_address, e)))?;
                     } else {
+                        diff_account_storage_roots.insert(hashed_address, alloy_trie::EMPTY_ROOT_HASH);
                         self.delete_account_with_hash_state(hashed_address)
                             .map_err(|e| TrieDBError::Database(format!("Failed to delete account for hashed_address {:#x}, error: {}", hashed_address, e)))?;
                     }
@@ -302,6 +303,7 @@ where
         account_result?;
         let update_storage = storage_result?;
         self.storage_tries = update_storage;
+        self.updated_storage_roots.extend(diff_account_storage_roots);
 
         drop(path_db_clone);
         drop(difflayer_clone);
