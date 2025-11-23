@@ -8,6 +8,7 @@ use rust_eth_triedb_pathdb::{PathDB, PathProviderConfig};
 // use rust_eth_triedb_snapshotdb::{SnapshotDB, PathProviderConfig as SnapshotPathProviderConfig};
 use super::TrieDB;
 use rust_eth_triedb_state_trie::node::init_empty_root_node;
+use tracing::info;
 
 // Global singleton for active_triedb flag - can only be initialized once
 static ACTIVE_TRIEDB: OnceLock<bool> = OnceLock::new();
@@ -64,6 +65,7 @@ pub fn init_global_manager(path: &str) {
         let path_str = path.to_string();
         TrieDBManager::new(&path_str)
     });
+    info!(target: "reth::cli", "TrieDB initialized with path: {path}");
     enable_triedb();
 }
 
