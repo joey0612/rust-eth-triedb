@@ -68,7 +68,7 @@ static MANAGER_INSTANCE: OnceLock<TrieDBManager> = OnceLock::new();
 /// # ⚠️ Important: Single Initialization Pattern
 /// # Panics
 /// This function will panic if `init_global_manager()` has been called twice.
-pub fn init_global_manager(path: &str) {
+pub fn init_global_triedb_manager(path: &str) {
     // Panic if already initialized
     if MANAGER_INSTANCE.get().is_some() {
         panic!("TrieDB has already been initialized. It can only be initialized once.");
