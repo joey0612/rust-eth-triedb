@@ -15,11 +15,25 @@ static ACTIVE_TRIEDB: OnceLock<bool> = OnceLock::new();
 
 // Enable the active_triedb flag
 pub fn enable_triedb() {
+    if let Some(&current_value) = ACTIVE_TRIEDB.get() {
+        if !current_value {
+            panic!("TrieDB is already disabled. Cannot enable it after it has been disabled.");
+        }
+        // Already enabled, nothing to do
+        return;
+    }
     ACTIVE_TRIEDB.get_or_init(|| true);
 }
 
 // Disable the active_triedb flag
 pub fn disable_triedb() {
+    if let Some(&current_value) = ACTIVE_TRIEDB.get() {
+        if current_value {
+            panic!("TrieDB is already enabled. Cannot disable it after it has been enabled.");
+        }
+        // Already disabled, nothing to do
+        return;
+    }
     ACTIVE_TRIEDB.get_or_init(|| false);
 }
 
