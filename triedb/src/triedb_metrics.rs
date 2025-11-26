@@ -10,7 +10,7 @@ use reth_metrics::{
 #[metrics(scope = "rust.eth.triedb")]
 pub(crate) struct TrieDBMetrics {
     /// Histogram of hashed post state transform durations (in seconds)
-    pub(crate) hashed_post_state_transform_histogram: Histogram,
+    // pub(crate) hashed_post_state_transform_histogram: Histogram,
     /// Histogram of update and commit prepare durations (in seconds)
     pub(crate) update_prepare_histogram: Histogram,
     /// Histogram of update and commit durations (in seconds)
@@ -42,9 +42,9 @@ impl TrieDBMetrics {
         self.flush_histogram.record(duration);
     }
 
-    pub(crate) fn record_hashed_post_state_transform_duration(&self, duration: f64) {
-        self.hashed_post_state_transform_histogram.record(duration);
-    }
+    // pub(crate) fn record_hashed_post_state_transform_duration(&self, duration: f64) {
+    //     self.hashed_post_state_transform_histogram.record(duration);
+    // }
 
     pub(crate) fn record_update_prepare_duration(&self, duration: f64) {
         self.update_prepare_histogram.record(duration);

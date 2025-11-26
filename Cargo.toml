@@ -40,8 +40,8 @@ rust-eth-triedb-pathdb = { version = "0.1.0", path = "db/pathdb" }
 rust-eth-triedb-state-trie = { version = "0.1.0", path = "state-trie" }
 
 # reth
-reth-trie-common = { git = "https://github.com/bnb-chain/reth.git", branch = "support_triedb"}
-reth-metrics = { git = "https://github.com/bnb-chain/reth.git", branch = "support_triedb"}
+#reth-trie-common = { git = "https://github.com/bnb-chain/reth.git", branch = "support_triedb"}
+reth-metrics = { git = "https://github.com/bnb-chain/reth.git"}
 
 # metrics (required by reth-metrics)
 metrics = "0.24.0"
