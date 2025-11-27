@@ -18,7 +18,6 @@ rust-eth-triedb-pathdb.workspace = true
 alloy-trie.workspace = true
 
 #reth
-reth-trie-common.workspace = true
 reth-metrics = { workspace = true, features = ["common"] }
 
 # LRU Cache

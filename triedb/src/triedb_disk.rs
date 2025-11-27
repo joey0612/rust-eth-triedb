@@ -23,14 +23,13 @@ where
             }
         }
 
-        if let Some(root) = self.path_db.get_storage_root(hased_address)
-            .map_err(|e| TrieDBError::Database(format!("Failed to get storage root: {:?}", e)))? {
-            self.metrics.increment_get_storage_root_from_flat_counter();
-            return Ok(Some(root));
-        }
-
+        // TODO: query storage root from flat kv, instead of trie
+        // if let Some(root) = self.path_db.get_storage_root(hased_address)
+        //     .map_err(|e| TrieDBError::Database(format!("Failed to get storage root: {:?}", e)))? {
+        //     self.metrics.increment_get_storage_root_from_flat_counter();
+        //     return Ok(Some(root));
+        // }
         if let Some(account) = self.get_account_with_hash_state(hased_address)? {
-            self.updated_storage_roots.insert(hased_address, account.storage_root);
             self.metrics.increment_get_storage_root_from_trie_counter();
             return Ok(Some(account.storage_root));
         }

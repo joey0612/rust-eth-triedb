@@ -7,8 +7,6 @@ use std::time::Instant;
 
 use alloy_primitives::B256;
 use alloy_primitives::U256;
-use alloy_trie::KECCAK_EMPTY;
-use reth_trie_common::HashedPostState;
 use rust_eth_triedb_common::TrieDatabase;
 use rust_eth_triedb_state_trie::node::{MergedNodeSet, DiffLayer, DiffLayers};
 use rust_eth_triedb_state_trie::state_trie::StateTrie;
@@ -102,6 +100,13 @@ where
     }
 }
 
+#[derive(Default, Clone)]
+pub struct TrieDBHashedPostState {
+    pub states: HashMap<B256, Option<StateAccount>>,
+    pub states_rebuild: HashSet<B256>,
+    pub storage_states: HashMap<B256, HashMap<B256, Option<U256>>>
+}
+
 /// Compatible with Reth client usage scenarios
 impl<DB> TrieDB<DB>
 where
@@ -114,64 +119,61 @@ where
         &mut self, 
         root_hash: B256, 
         difflayer: Option<&DiffLayers>, 
-        hashed_post_state: &HashedPostState) -> 
+        hashed_post_state: &TrieDBHashedPostState) -> 
         Result<(B256, Option<Arc<DiffLayer>>), TrieDBError> {
 
-        let hashed_post_state_transform_start = Instant::now();
-        let mut states: HashMap<alloy_primitives::FixedBytes<32>, Option<StateAccount>> = HashMap::new();
-        let mut states_rebuild = HashSet::new();
-        let mut storage_states = HashMap::new();
+        // let mut states: HashMap<alloy_primitives::FixedBytes<32>, Option<StateAccount>> = HashMap::new();
+        // let mut states_rebuild = HashSet::new();
+        // let mut storage_states = HashMap::new();
         
-        for (hashed_address, account) in hashed_post_state.accounts.iter() {
-            match account {
-                Some(account) => {
-                    let code_hash = match account.bytecode_hash {
-                        Some(code_hash) => code_hash,
-                        None => KECCAK_EMPTY
-                    };
-                    let acc = StateAccount::default()
-                        .with_nonce(account.nonce)
-                        .with_balance(account.balance)
-                        .with_code_hash(code_hash);
-                    states.insert(*hashed_address, Some(acc));
+        // for (hashed_address, account) in hashed_post_state.accounts.iter() {
+        //     match account {
+        //         Some(account) => {
+        //             let code_hash = match account.bytecode_hash {
+        //                 Some(code_hash) => code_hash,
+        //                 None => KECCAK_EMPTY
+        //             };
+        //             let acc = StateAccount::default()
+        //                 .with_nonce(account.nonce)
+        //                 .with_balance(account.balance)
+        //                 .with_code_hash(code_hash);
+        //             states.insert(*hashed_address, Some(acc));
 
-                    // check if the account is being rebuilt
-                    if let Some(storages) = hashed_post_state.storages.get(hashed_address) {
-                        if storages.wiped {
-                            states_rebuild.insert(*hashed_address);
-                        }
-                    }
-                }
-                None => {
-                    states.insert(*hashed_address, None);
-                }
-            }
-        }
+        //             // check if the account is being rebuilt
+        //             if let Some(storages) = hashed_post_state.storages.get(hashed_address) {
+        //                 if storages.wiped {
+        //                     states_rebuild.insert(*hashed_address);
+        //                 }
+        //             }
+        //         }
+        //         None => {
+        //             states.insert(*hashed_address, None);
+        //         }
+        //     }
+        // }
 
-        for (hashed_address, storages) in hashed_post_state.storages.iter() {
-            if storages.storage.is_empty() {
-                continue;
-            }
-            let mut kvs = HashMap::new();
-            for (hashed_key, value) in storages.storage.iter() {
-                if value.is_zero() {
-                    // if the value is zero, it means the storage is being deleted
-                    kvs.insert(*hashed_key, None);
-                } else {
-                    kvs.insert(*hashed_key, Some(*value));
-                }
-            }
-            storage_states.insert(*hashed_address, kvs);
-        }
-
-        self.metrics.record_hashed_post_state_transform_duration(hashed_post_state_transform_start.elapsed().as_secs_f64());
+        // for (hashed_address, storages) in hashed_post_state.storages.iter() {
+        //     if storages.storage.is_empty() {
+        //         continue;
+        //     }
+        //     let mut kvs = HashMap::new();
+        //     for (hashed_key, value) in storages.storage.iter() {
+        //         if value.is_zero() {
+        //             // if the value is zero, it means the storage is being deleted
+        //             kvs.insert(*hashed_key, None);
+        //         } else {
+        //             kvs.insert(*hashed_key, Some(*value));
+        //         }
+        //     }
+        //     storage_states.insert(*hashed_address, kvs);
+        // }
 
         let (root_hash, node_set, diff_storage_roots) = self.batch_update_and_commit(
             root_hash, 
             difflayer, 
-            states, 
-            states_rebuild, 
-            storage_states)?;
+            hashed_post_state.states.clone(), 
+            hashed_post_state.states_rebuild.clone(), 
+            hashed_post_state.storage_states.clone())?;
 
         let diff_nodes = (*node_set.to_diff_nodes()).clone();
         let difflayer = Arc::new(DiffLayer::new(diff_nodes, diff_storage_roots));
@@ -211,13 +213,11 @@ where
 
         for (hashed_address, new_account) in states {
             if new_account.is_none() {
-                self.updated_storage_roots.insert(hashed_address, alloy_trie::KECCAK_EMPTY);
                 update_accounts.insert(hashed_address, None);
                 continue;
             }
 
             let final_account = if states_rebuild.contains(&hashed_address) {
-                self.updated_storage_roots.insert(hashed_address, alloy_trie::KECCAK_EMPTY);
                 new_account.unwrap()
             }else {
                 if let Some(storage_root) = self.get_storage_root(hashed_address)? {
@@ -243,6 +243,7 @@ where
         // 3. Prepare required data to avoid borrowing conflicts for parallel execution
         let path_db_clone = self.path_db.clone();
         let difflayer_clone = self.difflayer.as_ref().map(|d| d.clone());
+        let mut diff_account_storage_roots = HashMap::new();
 
         // 4. Parallel execution: update accounts and storage simultaneously
         let (account_result, storage_result): (Result<(), TrieDBError>, Result<HashMap<B256, StateTrie<DB>>, TrieDBError>) = rayon::join(
@@ -256,9 +257,11 @@ where
                 // update accounts that are being updated
                 for (hashed_address, account) in update_accounts {
                     if let Some(account) = account {
+                        diff_account_storage_roots.insert(hashed_address, account.storage_root);
                         self.update_account_with_hash_state(hashed_address, &account)
                             .map_err(|e| TrieDBError::Database(format!("Failed to update account for hashed_address {:#x}, error: {}", hashed_address, e)))?;
                     } else {
+                        diff_account_storage_roots.insert(hashed_address, alloy_trie::EMPTY_ROOT_HASH);
                         self.delete_account_with_hash_state(hashed_address)
                             .map_err(|e| TrieDBError::Database(format!("Failed to delete account for hashed_address {:#x}, error: {}", hashed_address, e)))?;
                     }
@@ -302,6 +305,7 @@ where
         account_result?;
         let update_storage = storage_result?;
         self.storage_tries = update_storage;
+        self.updated_storage_roots.extend(diff_account_storage_roots);
 
         drop(path_db_clone);
         drop(difflayer_clone);
