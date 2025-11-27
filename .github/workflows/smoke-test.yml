@@ -19,7 +19,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
