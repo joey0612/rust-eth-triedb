@@ -49,6 +49,7 @@ asm-keccak = ["alloy-primitives/asm-keccak"]
 # misc
 pretty_assertions.workspace = true
 tempfile.workspace = true
+ctor = { workspace = true }
 
 [profile.maxperf]
 inherits = "release"
