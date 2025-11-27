@@ -20,11 +20,6 @@ jobs:
         with:
           toolchain: stable
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y liburing-dev
-
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
