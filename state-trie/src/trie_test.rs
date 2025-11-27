@@ -8,9 +8,14 @@ use super::node::init_empty_root_node;
 use alloy_trie::{EMPTY_ROOT_HASH};
 use std::env;
 
+// Initialize empty root node before all tests run
+#[ctor::ctor]
+fn init() {
+    init_empty_root_node();
+}
+
 #[test]
 fn test_trie_update_and_get() {
-    init_empty_root_node();
 
     // Create temporary directory path
     let temp_dir = env::temp_dir().join("trie_test_pathdb");
@@ -200,7 +205,6 @@ fn test_trie_nonexistent_key() {
 
 #[test]
 fn test_trie_binary_data() {
-    init_empty_root_node();
 
     // Create temporary directory path
     let temp_dir = env::temp_dir().join("trie_test_binary");
@@ -2154,7 +2158,6 @@ fn test_u256_storage_with_hash_state() {
 
 #[test]
 fn test_trie_empty_root_with_10_keys() {
-    init_empty_root_node();
 
     // Create temporary directory path
     let temp_dir = env::temp_dir().join("trie_test_empty_root");

@@ -76,15 +76,16 @@ cargo test --workspace
 Here's a step-by-step example demonstrating the basic usage of TrieDB:
 
 ```rust
-use rust_eth_triedb::{init_global_manager, get_global_triedb};
-use reth_trie_common::{HashedPostState, HashedStorage};
-use reth_primitives_traits::Account;
+use rust_eth_triedb::{init_global_triedb_manager, get_global_triedb, TrieDBHashedPostState};
+use rust_eth_triedb_state_trie::account::StateAccount;
 use alloy_primitives::{keccak256, Address, B256, U256};
+use alloy_consensus::constants::KECCAK_EMPTY;
 use std::str::FromStr;
+use std::collections::{HashMap, HashSet};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 1. Initialize the global TrieDB manager with database path
-    init_global_manager("/path/to/database");
+    init_global_triedb_manager("/path/to/database");
     
     // 2. Get the global TrieDB instance
     let mut triedb = get_global_triedb();
@@ -93,34 +94,40 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let address = Address::from_str("0x1234567890123456789012345678901234567890")?;
     let hashed_address = keccak256(address);
     
-    // Create account with balance and nonce
-    let account = Account {
-        balance: U256::from(1000000000000000000u128), // 1 ETH
-        nonce: 1,
-        bytecode_hash: Some(B256::ZERO),
-    };
+    // Create StateAccount with balance, nonce, and code hash
+    let state_account = StateAccount::default()
+        .with_balance(U256::from(1000000000000000000u128)) // 1 ETH
+        .with_nonce(1)
+        .with_code_hash(KECCAK_EMPTY); // or use actual code hash
     
     // 4. Prepare storage data
     let storage_key = keccak256(b"balance");
     let storage_value = U256::from(1000000000000000000u128);
     
-    // Create hashed storage with storage entries
-    let hashed_storage = HashedStorage::from_iter(
-        false, // wiped = false
-        vec![(storage_key, storage_value)]
-    );
+    // Create storage states map: hashed_address -> (hashed_key -> value)
+    let mut storage_states = HashMap::new();
+    let mut account_storage = HashMap::new();
+    account_storage.insert(storage_key, Some(storage_value));
+    storage_states.insert(hashed_address, account_storage);
     
-    // 5. Organize data into HashedPostState
-    let hashed_post_state = HashedPostState::default()
-        .with_accounts(vec![(hashed_address, Some(account))])
-        .with_storages(vec![(hashed_address, hashed_storage)]);
+    // 5. Organize data into TrieDBHashedPostState
+    let mut triedb_hashed_post_state = TrieDBHashedPostState::default();
+    
+    // Set account states
+    triedb_hashed_post_state.states.insert(hashed_address, Some(state_account));
+    
+    // Set storage states
+    triedb_hashed_post_state.storage_states = storage_states;
+    
+    // Optionally mark accounts for rebuild (if storage was wiped)
+    // triedb_hashed_post_state.states_rebuild.insert(hashed_address);
     
     // 6. Commit the hashed post state
     let state_root = B256::ZERO; // or any existing state root
     let (root_hash, difflayer) = triedb.commit_hashed_post_state(
         state_root,
         None, // no previous difflayer
-        &hashed_post_state
+        &triedb_hashed_post_state
     )?;
     println!("Committed root hash: {:?}", root_hash);
     

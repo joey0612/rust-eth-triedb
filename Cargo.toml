@@ -46,6 +46,9 @@ reth-metrics = { git = "https://github.com/bnb-chain/reth.git"}
 metrics = "0.24.0"
 metrics-derive = "0.1"
 
+# test utilities
+ctor = "0.2"
+
 [workspace.features]
 jemalloc = ["tikv-jemallocator"]
 jemalloc-prof = ["tikv-jemallocator?/profiling"]
