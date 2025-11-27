@@ -13,5 +13,8 @@ fn main() {
     println!("cargo:rustc-link-lib=dylib=bsc_trie");
 
     // Only rerun this build script if the C library changes
+    // Support both .dylib (macOS) and .so (Linux)
     println!("cargo:rerun-if-changed=libbsc_trie.dylib");
+    println!("cargo:rerun-if-changed=libbsc_trie.so");
 }
+
