@@ -122,52 +122,6 @@ where
         hashed_post_state: &TrieDBHashedPostState) -> 
         Result<(B256, Option<Arc<DiffLayer>>), TrieDBError> {
 
-        // let mut states: HashMap<alloy_primitives::FixedBytes<32>, Option<StateAccount>> = HashMap::new();
-        // let mut states_rebuild = HashSet::new();
-        // let mut storage_states = HashMap::new();
-        
-        // for (hashed_address, account) in hashed_post_state.accounts.iter() {
-        //     match account {
-        //         Some(account) => {
-        //             let code_hash = match account.bytecode_hash {
-        //                 Some(code_hash) => code_hash,
-        //                 None => KECCAK_EMPTY
-        //             };
-        //             let acc = StateAccount::default()
-        //                 .with_nonce(account.nonce)
-        //                 .with_balance(account.balance)
-        //                 .with_code_hash(code_hash);
-        //             states.insert(*hashed_address, Some(acc));
-
-        //             // check if the account is being rebuilt
-        //             if let Some(storages) = hashed_post_state.storages.get(hashed_address) {
-        //                 if storages.wiped {
-        //                     states_rebuild.insert(*hashed_address);
-        //                 }
-        //             }
-        //         }
-        //         None => {
-        //             states.insert(*hashed_address, None);
-        //         }
-        //     }
-        // }
-
-        // for (hashed_address, storages) in hashed_post_state.storages.iter() {
-        //     if storages.storage.is_empty() {
-        //         continue;
-        //     }
-        //     let mut kvs = HashMap::new();
-        //     for (hashed_key, value) in storages.storage.iter() {
-        //         if value.is_zero() {
-        //             // if the value is zero, it means the storage is being deleted
-        //             kvs.insert(*hashed_key, None);
-        //         } else {
-        //             kvs.insert(*hashed_key, Some(*value));
-        //         }
-        //     }
-        //     storage_states.insert(*hashed_address, kvs);
-        // }
-
         let (root_hash, node_set, diff_storage_roots) = self.batch_update_and_commit(
             root_hash, 
             difflayer, 
