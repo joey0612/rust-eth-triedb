@@ -1,7 +1,7 @@
 name: Test
 
 on:
-  push:
+  pull_request:
     branches:
       - develop
       - main
@@ -19,6 +19,11 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y liburing-dev
 
       - name: Cache cargo registry
         uses: actions/cache@v4
