@@ -58,6 +58,10 @@ asm-keccak = [
     "rust-eth-triedb-state-trie/asm-keccak",
     "rust-eth-triedb/asm-keccak",
     "rust-eth-triedb-smoke-test/asm-keccak",
+]
+io-uring = [
+    "rust-eth-triedb-pathdb/io-uring",
+    "rust-eth-triedb/io-uring",
 ] 
 
 [profile.release]
