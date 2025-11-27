@@ -25,6 +25,18 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y liburing-dev
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Build BSC Go library
+        run: |
+          cd smoke-test
+          go build -buildmode=c-shared -o libbsc_trie.so bsc_trie_wrapper.go
+          sudo cp libbsc_trie.so /usr/local/lib/
+          sudo ldconfig
+
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
